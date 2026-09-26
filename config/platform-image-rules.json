@@ -1,0 +1,375 @@
+{
+  "platforms": [
+    {
+      "id": "taobao",
+      "name": "淘宝",
+      "mainImage": {
+        "width": 800,
+        "height": 800,
+        "format": ["jpg", "png"],
+        "maxSize": 3145728,
+        "background": "white_or_scene",
+        "minProductRatio": 0.5,
+        "allowText": false,
+        "allowWatermark": false,
+        "allowBorder": false
+      },
+      "detailImage": {
+        "width": 790,
+        "format": ["jpg", "png"],
+        "maxSize": 524288
+      },
+      "styleRequirements": {
+        "background": {
+          "mainImageType": "白底图或场景图均可",
+          "recommendation": "白底图更利于搜索展示，场景图可作为辅图",
+          "sceneStyle": "生活化场景、使用场景展示"
+        },
+        "composition": {
+          "productPlacement": "居中展示",
+          "productCoverage": "建议占画面70%-85%",
+          "angle": "正面或斜45度，展示产品主要特征"
+        },
+        "lighting": {
+          "type": "均匀柔光",
+          "shadow": "避免过重阴影，保持画面清爽",
+          "colorTemperature": "自然光色温，还原产品真实颜色"
+        },
+        "quality": {
+          "clarity": "高清晰度，细节清晰可见",
+          "color": "色彩饱和适中，避免过度修图",
+          "consistency": "同一商品多图风格保持一致"
+        },
+        "restrictions": {
+          "mainImageText": "主图严禁文字、价格、促销信息",
+          "watermark": "禁止水印",
+          "border": "不建议添加边框装饰",
+          "collage": "主图禁止拼图",
+          "props": "可适当使用道具衬托，但不能喧宾夺主"
+        }
+      }
+    },
+    {
+      "id": "tmall",
+      "name": "天猫",
+      "mainImage": {
+        "width": 800,
+        "height": 800,
+        "format": ["jpg", "png"],
+        "maxSize": 3145728,
+        "background": "white_or_scene",
+        "minProductRatio": 0.5,
+        "allowText": false,
+        "allowWatermark": false,
+        "allowBorder": false
+      },
+      "detailImage": {
+        "width": 790,
+        "format": ["jpg", "png"],
+        "maxSize": 524288
+      },
+      "styleRequirements": {
+        "background": {
+          "mainImageType": "白底图优先，品质感更强",
+          "recommendation": "主图使用纯白背景(RGB 255,255,255)，突出品牌调性",
+          "sceneStyle": "辅图可使用高端场景、生活方式展示"
+        },
+        "composition": {
+          "productPlacement": "居中展示，追求对称美感",
+          "productCoverage": "建议占画面75%-85%",
+          "angle": "多角度展示，突出产品设计感"
+        },
+        "lighting": {
+          "type": "专业影棚光，三点布光",
+          "shadow": "柔和阴影增加立体感",
+          "colorTemperature": "色温统一，体现品质感"
+        },
+        "quality": {
+          "clarity": "高清晰度，展现品牌品质",
+          "color": "色彩准确，符合品牌VI",
+          "consistency": "整体风格统一，体现品牌形象"
+        },
+        "restrictions": {
+          "mainImageText": "主图严禁任何文字信息",
+          "watermark": "禁止水印",
+          "border": "禁止边框",
+          "collage": "主图禁止拼图",
+          "props": "道具需符合品牌定位和产品调性"
+        }
+      }
+    },
+    {
+      "id": "jd",
+      "name": "京东",
+      "mainImage": {
+        "width": 800,
+        "height": 800,
+        "format": ["jpg", "png"],
+        "maxSize": 1048576,
+        "background": "white",
+        "minProductRatio": 0.6,
+        "allowText": false,
+        "allowWatermark": false,
+        "allowBorder": false
+      },
+      "detailImage": {
+        "width": 750,
+        "format": ["jpg"],
+        "maxSize": 524288
+      },
+      "styleRequirements": {
+        "background": {
+          "mainImageType": "纯白底图(RGB 255,255,255)强制要求",
+          "recommendation": "主图必须白底，辅图可使用场景图",
+          "sceneStyle": "场景图注重使用环境展示"
+        },
+        "composition": {
+          "productPlacement": "严格居中，水平垂直对齐",
+          "productCoverage": "建议占画面75%-85%",
+          "angle": "正面平视为主，展示产品正面信息"
+        },
+        "lighting": {
+          "type": "均匀正面光，减少阴影",
+          "shadow": "最小化阴影，保持背景纯净",
+          "colorTemperature": "自然日光，真实还原产品"
+        },
+        "quality": {
+          "clarity": "高清晰，产品细节完整展示",
+          "color": "色彩还原准确，不过度饱和",
+          "consistency": "统一规范的产品图风格"
+        },
+        "restrictions": {
+          "mainImageText": "主图严禁文字、图标、促销标签",
+          "watermark": "严禁水印",
+          "border": "严禁边框",
+          "collage": "严禁拼图",
+          "props": "主图禁止道具，辅图可适当使用",
+          "packaging": "不显示外包装，除非是包装本身是卖点"
+        }
+      }
+    },
+    {
+      "id": "pdd",
+      "name": "拼多多",
+      "mainImage": {
+        "width": 750,
+        "height": 750,
+        "format": ["jpg"],
+        "maxSize": 1048576,
+        "background": "white",
+        "minProductRatio": 0.7,
+        "allowText": false,
+        "allowWatermark": false,
+        "allowBorder": false
+      },
+      "detailImage": {
+        "width": 750,
+        "format": ["jpg"],
+        "maxSize": 524288
+      },
+      "styleRequirements": {
+        "background": {
+          "mainImageType": "纯白底图(RGB 255,255,255)",
+          "recommendation": "主图必须纯白背景，无渐变无纹理",
+          "sceneStyle": "辅图可展示使用场景，强调性价比"
+        },
+        "composition": {
+          "productPlacement": "居中饱满展示",
+          "productCoverage": "产品占比70%-90%，尽量填充画面",
+          "angle": "突出产品主要卖点的最佳角度"
+        },
+        "lighting": {
+          "type": "明亮均匀光线",
+          "shadow": "避免阴影，保持画面干净",
+          "colorTemperature": "明亮色调，增强视觉吸引力"
+        },
+        "quality": {
+          "clarity": "清晰展示产品，突出细节",
+          "color": "色彩鲜艳饱满，吸引眼球",
+          "consistency": "风格统一，强调产品价值感"
+        },
+        "restrictions": {
+          "mainImageText": "主图禁止文字（品牌LOGO除外）",
+          "watermark": "禁止水印",
+          "border": "禁止边框",
+          "collage": "主图禁止拼接多个产品",
+          "props": "减少不必要道具，突出产品本身"
+        }
+      }
+    },
+    {
+      "id": "douyin",
+      "name": "抖音小店",
+      "mainImage": {
+        "width": 800,
+        "height": 800,
+        "format": ["jpg", "png"],
+        "maxSize": 2097152,
+        "background": "any",
+        "minProductRatio": 0.6,
+        "allowText": true,
+        "allowWatermark": false,
+        "allowBorder": false,
+        "allowCollage": false
+      },
+      "detailImage": {
+        "width": 750,
+        "format": ["jpg", "png"],
+        "maxSize": 524288
+      },
+      "styleRequirements": {
+        "background": {
+          "mainImageType": "白底图或场景图均可，场景图更受欢迎",
+          "recommendation": "生活化场景图，符合短视频调性",
+          "sceneStyle": "真实使用场景、网红风格、氛围感强"
+        },
+        "composition": {
+          "productPlacement": "可活泼多样，不拘泥于居中",
+          "productCoverage": "建议占画面60%-80%",
+          "angle": "多样化角度，展现产品使用状态"
+        },
+        "lighting": {
+          "type": "自然光或温暖光线",
+          "shadow": "自然阴影，增强真实感",
+          "colorTemperature": "温暖明亮，符合内容平台调性"
+        },
+        "quality": {
+          "clarity": "高清，适配移动端浏览",
+          "color": "色彩鲜明，适合信息流展示",
+          "consistency": "可与短视频内容风格保持一致"
+        },
+        "restrictions": {
+          "mainImageText": "允许少量卖点文字，不超过画面30%",
+          "watermark": "禁止水印",
+          "border": "简洁边框可接受",
+          "collage": "禁止复杂拼图",
+          "props": "鼓励场景化道具，增强代入感"
+        }
+      }
+    },
+    {
+      "id": "kuaishou",
+      "name": "快手小店",
+      "mainImage": {
+        "width": 800,
+        "height": 800,
+        "format": ["jpg", "png"],
+        "maxSize": 2097152,
+        "background": "any",
+        "minProductRatio": 0.6,
+        "allowText": true,
+        "allowWatermark": false,
+        "allowBorder": false
+      },
+      "detailImage": {
+        "width": 750,
+        "format": ["jpg", "png"],
+        "maxSize": 524288
+      },
+      "styleRequirements": {
+        "background": {
+          "mainImageType": "场景图或白底图均可",
+          "recommendation": "接地气的真实场景，贴近用户生活",
+          "sceneStyle": "家庭场景、日常使用场景"
+        },
+        "composition": {
+          "productPlacement": "灵活布局，突出产品实用性",
+          "productCoverage": "建议占画面60%-80%",
+          "angle": "真实使用角度，增强信任感"
+        },
+        "lighting": {
+          "type": "自然光为主",
+          "shadow": "自然真实的阴影",
+          "colorTemperature": "真实还原，不过度美化"
+        },
+        "quality": {
+          "clarity": "清晰展示，贴近真实",
+          "color": "自然真实，避免过度修饰",
+          "consistency": "朴实风格，增强可信度"
+        },
+        "restrictions": {
+          "mainImageText": "允许简单卖点文字",
+          "watermark": "禁止水印",
+          "border": "简单边框可接受",
+          "collage": "不建议复杂拼图",
+          "props": "生活化道具，贴近用户"
+        }
+      }
+    },
+    {
+      "id": "amazon",
+      "name": "亚马逊",
+      "mainImage": {
+        "width": 1600,
+        "height": 1600,
+        "format": ["jpg", "png"],
+        "maxSize": 10485760,
+        "background": "white",
+        "minProductRatio": 0.85,
+        "allowText": false,
+        "allowWatermark": false,
+        "allowBorder": false,
+        "dpi": 300
+      },
+      "detailImage": {
+        "width": 1000,
+        "format": ["jpg", "png"],
+        "maxSize": 10485760
+      },
+      "styleRequirements": {
+        "background": {
+          "mainImageType": "纯白底图(RGB 255,255,255)严格强制",
+          "recommendation": "主图必须纯白底，辅图可使用生活场景、信息图",
+          "sceneStyle": "辅图可展示使用场景、尺寸对比、细节特写"
+        },
+        "composition": {
+          "productPlacement": "严格居中，精确对齐",
+          "productCoverage": "产品必须占画面85%以上",
+          "angle": "专业角度，完整展示产品"
+        },
+        "lighting": {
+          "type": "专业影棚三点布光",
+          "shadow": "柔和自然阴影或完全无阴影",
+          "colorTemperature": "色温统一，色彩准确还原"
+        },
+        "quality": {
+          "clarity": "高分辨率(1600px+)，支持缩放查看细节",
+          "color": "色彩精确，符合产品实物",
+          "consistency": "专业统一的产品摄影风格"
+        },
+        "restrictions": {
+          "mainImageText": "主图严禁任何文字、图标、logo（产品本身logo除外）",
+          "watermark": "严禁水印",
+          "border": "严禁边框、装饰元素",
+          "collage": "严禁拼图、多角度组合",
+          "props": "主图严禁道具、模特、场景元素",
+          "packaging": "不能显示包装盒（除非包装本身是产品）",
+          "enforcement": "亚马逊自动化检测，违规会导致listing被suppressed"
+        }
+      }
+    }
+  ],
+  "commonStyleGuidelines": {
+    "photography": {
+      "equipment": "使用专业相机或高质量手机，确保足够像素",
+      "lighting": "避免直射硬光，使用柔光箱或自然散射光",
+      "focus": "确保产品清晰对焦，背景虚化（如需要）",
+      "postProcessing": "适度后期，保持产品真实性"
+    },
+    "colorManagement": {
+      "calibration": "显示器色彩校准，确保颜色准确",
+      "space": "使用sRGB色彩空间",
+      "consistency": "同一产品不同图片色调保持一致"
+    },
+    "productPresentation": {
+      "cleanliness": "产品表面干净，无指纹、灰尘",
+      "completeness": "产品完整展示，无遮挡关键部位",
+      "authenticity": "真实展示产品，避免过度PS造成买卖纠纷"
+    },
+    "platformAdaptation": {
+      "priority": "优先满足目标平台的强制要求",
+      "multiPlatform": "跨平台发布时，准备多套图片适配不同规则",
+      "testing": "上传前预览效果，确认符合平台展示要求"
+    }
+  }
+}

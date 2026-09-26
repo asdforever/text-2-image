@@ -1,0 +1,51 @@
+{
+  "version": "v1",
+  "principles": [
+    "hierarchy",
+    "alignment",
+    "contrast",
+    "proximity",
+    "scale",
+    "whitespace",
+    "grid",
+    "truthfulness"
+  ],
+  "narrative_stages": [
+    "overview",
+    "feature",
+    "scenario",
+    "scale",
+    "detail",
+    "spec",
+    "trust",
+    "close"
+  ],
+  "layout_families": [
+    "centered_hero",
+    "split_copy_product",
+    "grid_callout",
+    "scene_caption_cluster",
+    "detail_annotation",
+    "exploded_detail",
+    "comparison",
+    "spec_table",
+    "quiet_close"
+  ],
+  "product_presence_values": [
+    "full",
+    "partial",
+    "context",
+    "detail",
+    "none"
+  ],
+  "subject_scale_values": ["large", "medium", "small"],
+  "text_density_values": ["low", "medium", "high"],
+  "hard_failures": [
+    "product_distortion",
+    "unsupported_claim",
+    "repeated_full_product_hero",
+    "repeated_camera_or_layout",
+    "unreadable_text",
+    "missing_required_evidence"
+  ]
+}

@@ -1,0 +1,2 @@
+"""PicAgent FastAPI backend package."""
+

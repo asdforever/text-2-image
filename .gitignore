@@ -1,0 +1,20 @@
+.env
+.env.*
+!.env.example
+
+var/
+output/
+artifacts/
+log/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+.idea/

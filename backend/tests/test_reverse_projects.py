@@ -1,0 +1,410 @@
+from io import BytesIO
+import asyncio
+from uuid import UUID, uuid4
+
+import httpx
+import pytest
+from PIL import Image
+
+from backend.app.core.config import Settings
+from backend.app.core.errors import AppError
+from backend.app.core.identity import IdentityContext, LocalSingleUserIdentityProvider
+from backend.app.main import create_app
+from backend.app.project_repository import InMemoryProjectRepository
+from backend.app.project_storage import MemoryProjectAssetStorage
+from backend.app.reverse_project_repository import InMemoryReverseProjectRepository
+from backend.app.repository import InMemoryRepository
+
+
+def png_bytes(color: str) -> bytes:
+    output = BytesIO()
+    Image.new("RGB", (8, 6), color).save(output, format="PNG")
+    return output.getvalue()
+
+
+class Planner:
+    def __init__(self, result=None, error: AppError | None = None) -> None:
+        self.result = result
+        self.error = error
+        self.requests = []
+
+    async def plan_modules(self, request):
+        self.requests.append(request)
+        if self.error:
+            raise self.error
+        return self.result
+
+
+def analysis_result(reference_id: str) -> dict:
+    return {
+        "category": "厨房电器",
+        "summary": "围绕快速出餐组织整套详情内容。",
+        "suitableFor": "强调效率与易清洁的厨房电器",
+        "goal": "建立从痛点到证据再到转化的内容顺序",
+        "requiredMaterials": "产品多角度图、容量和材质事实",
+        "notSuitableFor": "缺少事实依据的功效或认证表达",
+        "overall": {
+            "contentFlow": "痛点、核心卖点、证据、场景、收口",
+            "visualSystem": "暖白底配深灰信息层级",
+            "moduleStrategy": "每屏只回答一个购买问题",
+            "adaptationRules": "参数和承诺必须替换为当前商品事实",
+        },
+        "modules": [
+            {
+                "id": "benefit-proof",
+                "title": "核心卖点证据",
+                "referenceImageId": reference_id,
+                "goal": "说明快速出餐的依据",
+                "layout": "左侧产品，右侧三层信息",
+                "informationHierarchy": "结论、证据、补充说明",
+                "typography": "大标题配紧凑参数",
+                "colorAndLighting": "暖白环境光，产品高光克制",
+                "adaptationNotes": "替换为当前商品容量和功率",
+            }
+        ],
+    }
+
+
+def editable_document(reference_id: str) -> dict:
+    result = analysis_result(reference_id)
+    return {
+        "category": result["category"],
+        "summary": result["summary"],
+        "suitableFor": result["suitableFor"],
+        "goal": result["goal"],
+        "requiredMaterials": result["requiredMaterials"],
+        "notSuitableFor": result["notSuitableFor"],
+        "overall": result["overall"],
+        "modules": result["modules"],
+    }
+
+
+def make_app(*, workspace_id=UUID(int=22), reverse_repository=None, storage=None, planner=None):
+    project_repository = InMemoryProjectRepository()
+    identity = LocalSingleUserIdentityProvider(
+        IdentityContext(UUID(int=11), workspace_id, "owner")
+    )
+    return create_app(
+        settings=Settings(_env_file=None, local_workspace_id=workspace_id),
+        repository=InMemoryRepository(),
+        project_repository=project_repository,
+        project_asset_storage=storage or MemoryProjectAssetStorage(),
+        identity_provider=identity,
+        reverse_project_repository=reverse_repository or InMemoryReverseProjectRepository(),
+        module_planner=planner,
+    )
+
+
+@pytest.mark.asyncio
+async def test_reverse_project_api_creates_and_lists_full_workspace_projects() -> None:
+    app = make_app()
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        created = await client.post(
+            "/api/reverse-projects",
+            json={"name": "厨房小家电反推", "category": "小家电"},
+        )
+        listed = await client.get("/api/reverse-projects")
+
+    assert created.status_code == 201, created.text
+    project = created.json()["data"]
+    assert project["name"] == "厨房小家电反推"
+    assert project["category"] == "小家电"
+    assert project["revision"] == 1
+    assert project["references"] == []
+    assert project["overall"] == {
+        "contentFlow": "",
+        "visualSystem": "",
+        "moduleStrategy": "",
+        "adaptationRules": "",
+    }
+    assert project["modules"] == []
+    assert project["analysis"] == {"status": "idle"}
+    assert project["versions"] == []
+    assert project["latestVersionId"] is None
+    assert listed.status_code == 200
+    assert listed.json()["data"] == [project]
+
+
+@pytest.mark.asyncio
+async def test_reverse_project_updates_use_revision_and_workspace_scope() -> None:
+    shared = InMemoryReverseProjectRepository()
+    app_a = make_app(workspace_id=UUID(int=22), reverse_repository=shared)
+    app_b = make_app(workspace_id=UUID(int=33), reverse_repository=shared)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app_a), base_url="http://test"
+    ) as client_a:
+        created = (await client_a.post("/api/reverse-projects", json={"name": "A"})).json()["data"]
+        patched = await client_a.patch(
+            f"/api/reverse-projects/{created['id']}",
+            json={"expectedRevision": 1, "summary": "人工摘要"},
+        )
+        stale = await client_a.patch(
+            f"/api/reverse-projects/{created['id']}",
+            json={"expectedRevision": 1, "summary": "过期写入"},
+        )
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app_b), base_url="http://test"
+    ) as client_b:
+        hidden = await client_b.get(f"/api/reverse-projects/{created['id']}")
+        listed = await client_b.get("/api/reverse-projects")
+
+    assert patched.status_code == 200
+    assert patched.json()["data"]["revision"] == 2
+    assert patched.json()["data"]["summary"] == "人工摘要"
+    assert stale.status_code == 409
+    assert hidden.status_code == 404
+    assert listed.json()["data"] == []
+
+
+@pytest.mark.asyncio
+async def test_reference_order_publish_immutability_and_planning_interfaces() -> None:
+    app = make_app()
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        project = (await client.post("/api/reverse-projects", json={"name": "整套反推"})).json()["data"]
+        first = await client.post(
+            f"/api/reverse-projects/{project['id']}/references",
+            files={"file": ("one.png", png_bytes("red"), "image/png")},
+        )
+        second = await client.post(
+            f"/api/reverse-projects/{project['id']}/references",
+            files={"file": ("two.png", png_bytes("blue"), "image/png")},
+        )
+        first_id = first.json()["data"]["references"][0]["id"]
+        second_id = second.json()["data"]["references"][1]["id"]
+        ordered = await client.put(
+            f"/api/reverse-projects/{project['id']}/reference-order",
+            json={"expectedRevision": 3, "referenceIds": [second_id, first_id]},
+        )
+        patched = await client.patch(
+            f"/api/reverse-projects/{project['id']}",
+            json={"expectedRevision": 4, **editable_document(first_id)},
+        )
+        published = await client.post(
+            f"/api/reverse-projects/{project['id']}/versions",
+            json={"expectedRevision": 5},
+        )
+        replay = await client.post(
+            f"/api/reverse-projects/{project['id']}/versions",
+            json={"expectedRevision": 5},
+        )
+        changed = await client.patch(
+            f"/api/reverse-projects/{project['id']}",
+            json={"expectedRevision": 5, "summary": "发布后的草稿修改"},
+        )
+        removed = await client.delete(
+            f"/api/reverse-projects/{project['id']}/references/{first_id}"
+        )
+        preview = await client.get(
+            f"/api/reverse-projects/{project['id']}/references/{first_id}/preview"
+        )
+        version_id = published.json()["data"]["id"]
+        frozen = await client.get(
+            f"/api/reverse-projects/{project['id']}/versions/{version_id}"
+        )
+
+    assert first.status_code == second.status_code == 200
+    assert [item["id"] for item in ordered.json()["data"]["references"]] == [second_id, first_id]
+    assert [item["ordinal"] for item in ordered.json()["data"]["references"]] == [1, 2]
+    assert patched.status_code == 200
+    assert published.status_code == 201
+    assert replay.json()["data"]["id"] == published.json()["data"]["id"]
+    assert changed.json()["data"]["summary"] == "发布后的草稿修改"
+    assert all(item["id"] != first_id for item in removed.json()["data"]["references"])
+    assert preview.status_code == 200
+    assert preview.content == png_bytes("red")
+    assert frozen.json()["data"]["document"]["summary"] == analysis_result(first_id)["summary"]
+
+    service = app.state.reverse_project_service
+    version = await service.get_version(UUID(version_id))
+    overall = await service.planning_context(version.id)
+    selected = await service.planning_context(version.id, "benefit-proof")
+    overall_images = await service.planning_images(version.id)
+    module_images = await service.planning_images(version.id, "benefit-proof")
+    assert overall["introduction"] == {
+        "category": "厨房电器",
+        "summary": analysis_result(first_id)["summary"],
+        "suitableFor": analysis_result(first_id)["suitableFor"],
+        "goal": analysis_result(first_id)["goal"],
+        "requiredMaterials": analysis_result(first_id)["requiredMaterials"],
+        "notSuitableFor": analysis_result(first_id)["notSuitableFor"],
+    }
+    assert overall["modules"] == [
+        {"id": "benefit-proof", "title": "核心卖点证据", "goal": "说明快速出餐的依据"}
+    ]
+    assert selected["modules"] == analysis_result(first_id)["modules"]
+    assert overall_images == ([], [])
+    assert module_images == ([png_bytes("red")], ["image/png"])
+
+
+@pytest.mark.asyncio
+async def test_publish_requires_complete_document() -> None:
+    app = make_app()
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        project = (await client.post("/api/reverse-projects", json={"name": "空草稿"})).json()["data"]
+        response = await client.post(
+            f"/api/reverse-projects/{project['id']}/versions",
+            json={"expectedRevision": 1},
+        )
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "REVERSE_PROJECT_NOT_PUBLISHABLE"
+
+
+@pytest.mark.asyncio
+async def test_analysis_uses_images_and_failure_preserves_manual_draft() -> None:
+    success_planner = Planner()
+    app = make_app(planner=success_planner)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        project = (await client.post("/api/reverse-projects", json={"name": "AI 反推"})).json()["data"]
+        uploaded = await client.post(
+            f"/api/reverse-projects/{project['id']}/references",
+            files={"file": ("one.png", png_bytes("green"), "image/png")},
+        )
+        reference_id = uploaded.json()["data"]["references"][0]["id"]
+        success_planner.result = analysis_result(reference_id)
+        analyzed = await client.post(
+            f"/api/reverse-projects/{project['id']}/analyze",
+            json={"expectedRevision": 2},
+        )
+
+    assert analyzed.status_code == 200, analyzed.text
+    assert analyzed.json()["data"]["analysis"] == {"status": "completed"}
+    assert analyzed.json()["data"]["revision"] == 3
+    assert success_planner.requests[0].image_inputs == [png_bytes("green")]
+    assert success_planner.requests[0].image_mime_types == ["image/png"]
+
+    failure_planner = Planner(error=AppError("MODULE_PLANNER_FAILED", "模型请求失败", 502))
+    failed_app = make_app(planner=failure_planner)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=failed_app), base_url="http://test"
+    ) as client:
+        failed_project = (await client.post("/api/reverse-projects", json={"name": "失败保留"})).json()["data"]
+        uploaded = await client.post(
+            f"/api/reverse-projects/{failed_project['id']}/references",
+            files={"file": ("one.png", png_bytes("yellow"), "image/png")},
+        )
+        patched = await client.patch(
+            f"/api/reverse-projects/{failed_project['id']}",
+            json={"expectedRevision": 2, "summary": "人工编辑不能丢"},
+        )
+        failure = await client.post(
+            f"/api/reverse-projects/{failed_project['id']}/analyze",
+            json={"expectedRevision": patched.json()["data"]["revision"]},
+        )
+        after = await client.get(f"/api/reverse-projects/{failed_project['id']}")
+
+    assert failure.status_code == 502
+    assert failure.json()["error"] == {"code": "MODULE_PLANNER_FAILED", "message": "模型请求失败"}
+    assert after.json()["data"]["summary"] == "人工编辑不能丢"
+    assert after.json()["data"]["analysis"] == {"status": "failed", "error": "模型请求失败"}
+
+
+@pytest.mark.asyncio
+async def test_inflight_analysis_cannot_overwrite_newer_manual_edits() -> None:
+    entered = asyncio.Event()
+    released = asyncio.Event()
+
+    class BlockingPlanner(Planner):
+        async def plan_modules(self, request):
+            self.requests.append(request)
+            entered.set()
+            await released.wait()
+            return self.result
+
+    planner = BlockingPlanner()
+    app = make_app(planner=planner)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        project = (await client.post("/api/reverse-projects", json={"name": "并发保护"})).json()["data"]
+        uploaded = await client.post(
+            f"/api/reverse-projects/{project['id']}/references",
+            files={"file": ("one.png", png_bytes("orange"), "image/png")},
+        )
+        reference_id = uploaded.json()["data"]["references"][0]["id"]
+        planner.result = analysis_result(reference_id)
+        pending = asyncio.create_task(
+            client.post(
+                f"/api/reverse-projects/{project['id']}/analyze",
+                json={"expectedRevision": 2},
+            )
+        )
+        await entered.wait()
+        edited = await client.patch(
+            f"/api/reverse-projects/{project['id']}",
+            json={"expectedRevision": 2, "summary": "分析期间的人工修改"},
+        )
+        released.set()
+        analyzed = await pending
+        after = await client.get(f"/api/reverse-projects/{project['id']}")
+
+    assert edited.status_code == 200
+    assert analyzed.status_code == 409
+    assert after.json()["data"]["summary"] == "分析期间的人工修改"
+    assert after.json()["data"]["analysis"]["status"] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_bindings_replace_only_the_same_target_slot() -> None:
+    app = make_app()
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        business = (await client.post("/api/projects", json={"name": "业务商品"})).json()["data"]
+        reverse = (await client.post("/api/reverse-projects", json={"name": "绑定来源"})).json()["data"]
+        uploaded = await client.post(
+            f"/api/reverse-projects/{reverse['id']}/references",
+            files={"file": ("one.png", png_bytes("purple"), "image/png")},
+        )
+        reference_id = uploaded.json()["data"]["references"][0]["id"]
+        patched = await client.patch(
+            f"/api/reverse-projects/{reverse['id']}",
+            json={"expectedRevision": 2, **editable_document(reference_id)},
+        )
+        version = await client.post(
+            f"/api/reverse-projects/{reverse['id']}/versions",
+            json={"expectedRevision": patched.json()["data"]["revision"]},
+        )
+        version_id = version.json()["data"]["id"]
+        hero = await client.put(
+            f"/api/projects/{business['id']}/reverse-bindings",
+            json={"target": "hero", "scope": "overall", "versionId": version_id},
+        )
+        suite = await client.put(
+            f"/api/projects/{business['id']}/reverse-bindings",
+            json={
+                "target": "suite",
+                "scope": "module",
+                "versionId": version_id,
+                "targetModuleId": "task-benefit",
+                "sourceModuleId": "benefit-proof",
+            },
+        )
+        replaced = await client.put(
+            f"/api/projects/{business['id']}/reverse-bindings",
+            json={"target": "hero", "scope": "overall", "versionId": version_id},
+        )
+        hero_only = await client.get(
+            f"/api/projects/{business['id']}/reverse-bindings?target=hero"
+        )
+        all_reverse = await client.get(
+            f"/api/reverse-projects/{reverse['id']}/bindings"
+        )
+        removed = await client.delete(
+            f"/api/projects/{business['id']}/reverse-bindings/{suite.json()['data']['id']}"
+        )
+
+    assert hero.status_code == suite.status_code == replaced.status_code == 200
+    assert hero_only.json()["data"] == [replaced.json()["data"]]
+    assert len(all_reverse.json()["data"]) == 2
+    assert {item["target"] for item in all_reverse.json()["data"]} == {"hero", "suite"}
+    assert removed.status_code == 200
+    assert removed.json()["data"] is True

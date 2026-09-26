@@ -1,0 +1,52 @@
+name: text-2-image
+
+# api 与 worker 共用同一份构建与运行配置，避免两个服务悄悄跑在不同代码上。
+x-backend: &backend
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: text-2-image-backend:local
+  restart: unless-stopped
+  env_file:
+    - .env
+  environment:
+    ENVIRONMENT: production
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+services:
+  api:
+    <<: *backend
+    ports:
+      # 绑定地址可配，默认只绑回环（够本地开发用）。
+      # 共用服务器上必须设 PICAGENT_API_BIND=<docker0 网关，通常 172.17.0.1>：
+      # 前端容器是走 host.docker.internal 过来的，目的地址是网关 IP 而不是 127.0.0.1，
+      # 只绑回环会让连接被拒，表现为 nginx 502 Bad Gateway。
+      # 绝不绑 0.0.0.0：既可能撞上别人的服务，也会把 API 直接暴露到公网。
+      - "${PICAGENT_API_BIND:-127.0.0.1}:8000:8000"
+    volumes:
+      - ./var/logs:/app/backend/logs
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5).status == 200 else 1)"
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 40s
+
+  worker:
+    <<: *backend
+    # 生图执行器必须常驻：只起 api 的话，确认过的批次会永远躺在队列里。
+    command: ["python", "-m", "backend.cli", "generation-worker"]
+    depends_on:
+      api:
+        condition: service_healthy
+    volumes:
+      - ./var/logs:/app/backend/logs
+
+networks:
+  default:
+    name: text-2-image-net

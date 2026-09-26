@@ -1,0 +1,87 @@
+kind: pipeline
+type: docker
+name: deploy
+
+# 同一时间只跑一条，避免两次推送并发重建镜像互相覆盖。
+concurrency:
+  limit: 1
+
+# 注入到所有 step，包括 Drone 自动加的内置 clone step。
+# 强制 git 走 HTTP/1.1：到托管平台的 HTTPS 偶发 HTTP/2 stream 错误。
+environment:
+  GIT_CONFIG_COUNT: "1"
+  GIT_CONFIG_KEY_0: http.version
+  GIT_CONFIG_VALUE_0: HTTP/1.1
+
+# 同时监听 master 与 main：GitHub 新建仓库的默认分支经常是 main，
+# 而协作者未必改得动仓库设置。两个都列上，推哪个都能触发。
+trigger:
+  event:
+    - push
+  branch:
+    - master
+    - main
+
+steps:
+  # 基础镜像预检。绝不用 `build --pull`：拉一个缺失的镜像可能挂十几分钟
+  # 且没有进度输出，会把流水线拖死。这里改成「本地没有就立刻失败 + 打印命令」。
+  - name: image-precheck
+    image: docker:28-cli
+    volumes:
+      - name: docker-sock
+        path: /var/run/docker.sock
+    commands:
+      - |
+        set -e
+        missing=""
+        for img in python:3.13-slim docker:28-cli; do
+          docker image inspect "$img" >/dev/null 2>&1 || missing="$missing $img"
+        done
+        if [ -n "$missing" ]; then
+          echo "宿主机缺少以下基础镜像，流水线主动中止：$missing"
+          for i in $missing; do echo "  docker pull $i"; done
+          exit 1
+        fi
+
+  - name: deploy
+    image: docker:28-cli
+    environment:
+      DOCKER_HOST: unix:///var/run/docker.sock
+      # 国内部分云主机到 github.com 的 HTTPS 不稳（GnuTLS recv error -110 /
+      # SSL connection timeout），所以宿主机上的仓库走 SSH remote。
+      # 容器里要用同一个私钥，否则 git fetch 会失败。
+      GIT_SSH_COMMAND: ssh -F /dev/null -i /root/.ssh/picagent_deploy -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/root/.ssh/known_hosts
+    volumes:
+      - name: docker-sock
+        path: /var/run/docker.sock
+      - name: app-dir
+        path: /srv/text-2-image
+      # 挂整个 .ssh 目录而不是单个私钥文件：如果宿主机上路径不存在，
+      # Docker 会把「文件挂载」自动建成一个空目录，ssh 会报奇怪的错。
+      - name: ssh-dir
+        path: /root/.ssh
+    commands:
+      # docker:cli 是 alpine 基础镜像，不自带 git，也没有 ssh 客户端。
+      - apk add --no-cache git openssh-client
+      # 容器内以 root 运行；宿主机仓库属主不同会被 git 拒绝。
+      - git config --global --add safe.directory /srv/text-2-image
+      - cd /srv/text-2-image
+      # 远端偶尔抖动，重试几次比直接失败划算。
+      - git fetch --all --prune || (sleep 5 && git fetch --all --prune)
+      - git checkout --force $DRONE_COMMIT_SHA
+      - docker compose -p text-2-image config --quiet
+      # 注意：不带 --pull，基础镜像由上面的 precheck 保证已在本地。
+      - docker compose -p text-2-image build
+      - docker compose -p text-2-image up -d --no-build --wait --wait-timeout 300
+      - docker compose -p text-2-image ps
+
+volumes:
+  - name: docker-sock
+    host:
+      path: /var/run/docker.sock
+  - name: app-dir
+    host:
+      path: /srv/text-2-image
+  - name: ssh-dir
+    host:
+      path: /root/.ssh

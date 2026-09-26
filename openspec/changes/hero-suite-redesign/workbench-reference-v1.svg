@@ -1,0 +1,270 @@
+<svg width="1440" height="960" viewBox="0 0 1440 960" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="shadow-sm" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#111827" flood-opacity="0.06"/>
+    </filter>
+    <filter id="shadow-lg" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#101828" flood-opacity="0.16"/>
+    </filter>
+    <linearGradient id="hero-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#111318"/>
+      <stop offset="0.58" stop-color="#25364A"/>
+      <stop offset="1" stop-color="#5BB8D3"/>
+    </linearGradient>
+    <linearGradient id="charger" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#F8FAFC"/>
+      <stop offset="1" stop-color="#BCC7D2"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#D7F7FF" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#72D8F4" stop-opacity="0.1"/>
+    </linearGradient>
+    <pattern id="dot-grid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="1" fill="#DDE2E8"/>
+    </pattern>
+    <clipPath id="canvas-clip">
+      <rect x="492" y="128" width="924" height="804" rx="16"/>
+    </clipPath>
+    <style>
+      text { font-family: Inter, "Noto Sans SC", "Microsoft YaHei", sans-serif; }
+      .title { fill: #171A1F; font-size: 16px; font-weight: 700; }
+      .label { fill: #24282E; font-size: 12px; font-weight: 650; }
+      .body { fill: #565D67; font-size: 11px; }
+      .muted { fill: #8B919A; font-size: 10px; }
+      .tiny { fill: #9BA1AA; font-size: 9px; }
+      .chip { fill: #2E333A; font-size: 10px; font-weight: 600; }
+    </style>
+  </defs>
+
+  <!-- App shell -->
+  <rect width="1440" height="960" fill="#F4F4F2"/>
+  <rect x="0.5" y="0.5" width="1439" height="959" rx="20" stroke="#E3E5E7"/>
+
+  <!-- Global navigation -->
+  <rect x="0" y="0" width="68" height="960" fill="#FFFFFF"/>
+  <path d="M68 0V960" stroke="#E8E9EA"/>
+  <rect x="18" y="18" width="32" height="32" rx="10" fill="#17191D"/>
+  <path d="M27 29.5L34 25L41 29.5V38.5L34 43L27 38.5V29.5Z" fill="white"/>
+  <circle cx="34" cy="34" r="3.5" fill="#17191D"/>
+
+  <g transform="translate(12 84)">
+    <rect width="44" height="48" rx="12" fill="#F1F2F3"/>
+    <rect x="14" y="9" width="16" height="15" rx="3" stroke="#23272D" stroke-width="1.5"/>
+    <path d="M16 21L20 17L23 20L26 16L29 20" stroke="#23272D" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="22" y="39" text-anchor="middle" fill="#202329" font-size="9" font-weight="650">工作台</text>
+  </g>
+  <g transform="translate(12 144)">
+    <rect width="44" height="48" rx="12" fill="white"/>
+    <path d="M14 12H30M14 18H30M14 24H23" stroke="#9AA0A8" stroke-width="1.5" stroke-linecap="round"/>
+    <text x="22" y="39" text-anchor="middle" fill="#8E949D" font-size="9">素材库</text>
+  </g>
+  <g transform="translate(12 204)">
+    <rect width="44" height="48" rx="12" fill="white"/>
+    <circle cx="22" cy="17" r="8" stroke="#9AA0A8" stroke-width="1.5"/>
+    <path d="M22 13V17L25 19" stroke="#9AA0A8" stroke-width="1.5" stroke-linecap="round"/>
+    <text x="22" y="39" text-anchor="middle" fill="#8E949D" font-size="9">任务</text>
+  </g>
+  <circle cx="34" cy="910" r="16" fill="#F2F3F4"/>
+  <text x="34" y="914" text-anchor="middle" fill="#555B64" font-size="11" font-weight="700">J</text>
+
+  <!-- Top bar -->
+  <rect x="68" width="1372" height="64" fill="#FFFFFF"/>
+  <path d="M68 64H1440" stroke="#E8E9EA"/>
+  <path d="M96 32H84M84 32L89 27M84 32L89 37" stroke="#34383E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="108" y="28" fill="#1D2025" font-size="13" font-weight="700">GAN65 无线充电器</text>
+  <text x="108" y="44" fill="#9298A1" font-size="9.5">商品视觉工作台 · 草稿自动保存</text>
+
+  <g transform="translate(532 16)">
+    <rect width="390" height="36" rx="11" fill="#F4F5F6"/>
+    <rect x="99" y="3" width="94" height="30" rx="9" fill="#FFFFFF" filter="url(#shadow-sm)"/>
+    <text x="49" y="23" text-anchor="middle" fill="#9399A2" font-size="11">白底图</text>
+    <text x="146" y="23" text-anchor="middle" fill="#1E2126" font-size="11" font-weight="700">主图</text>
+    <text x="244" y="23" text-anchor="middle" fill="#9399A2" font-size="11">详情图</text>
+    <text x="341" y="23" text-anchor="middle" fill="#9399A2" font-size="11">视频</text>
+  </g>
+
+  <g transform="translate(1264 16)">
+    <rect width="64" height="32" rx="9" fill="#FFFFFF" stroke="#DFE2E5"/>
+    <path d="M14 16H21M17.5 12.5V19.5" stroke="#646B75" stroke-width="1.3" stroke-linecap="round"/>
+    <text x="43" y="20" text-anchor="middle" fill="#59606A" font-size="10">历史</text>
+    <rect x="72" width="76" height="32" rx="9" fill="#17191D"/>
+    <text x="110" y="20" text-anchor="middle" fill="white" font-size="10" font-weight="650">保存草稿</text>
+  </g>
+
+  <!-- Workspace title and stepper -->
+  <rect x="68" y="64" width="1372" height="64" fill="#F8F8F6"/>
+  <text x="92" y="91" class="title">主图生成</text>
+  <text x="92" y="108" class="muted">从商品素材到可投放视觉，一页完成</text>
+  <g transform="translate(786 82)">
+    <circle cx="0" cy="0" r="10" fill="#17191D"/>
+    <text x="0" y="3.5" text-anchor="middle" fill="white" font-size="9" font-weight="700">1</text>
+    <text x="18" y="3.5" fill="#24282E" font-size="10" font-weight="650">配置</text>
+    <path d="M62 0H116" stroke="#D9DCDF"/>
+    <circle cx="132" cy="0" r="10" fill="#FFFFFF" stroke="#D9DCDF"/>
+    <text x="132" y="3.5" text-anchor="middle" fill="#9BA1AA" font-size="9">2</text>
+    <text x="150" y="3.5" fill="#9BA1AA" font-size="10">生成中</text>
+    <path d="M200 0H254" stroke="#D9DCDF"/>
+    <circle cx="270" cy="0" r="10" fill="#FFFFFF" stroke="#D9DCDF"/>
+    <text x="270" y="3.5" text-anchor="middle" fill="#9BA1AA" font-size="9">3</text>
+    <text x="288" y="3.5" fill="#9BA1AA" font-size="10">完成</text>
+  </g>
+
+  <!-- Left configuration rail -->
+  <rect x="84" y="128" width="392" height="804" rx="16" fill="#F7F7F5" stroke="#E1E3E5"/>
+  <rect x="96" y="140" width="368" height="78" rx="12" fill="#FFFFFF" stroke="#E5E6E8" filter="url(#shadow-sm)"/>
+  <rect x="108" y="152" width="52" height="52" rx="9" fill="#EEF0F1"/>
+  <ellipse cx="134" cy="178" rx="16" ry="13" fill="url(#charger)"/>
+  <circle cx="134" cy="178" r="8" fill="#D5DEE5" stroke="#A9B5C0"/>
+  <circle cx="139" cy="173" r="2" fill="#71C8E2"/>
+  <text x="172" y="168" class="label">继续上次的配置</text>
+  <text x="172" y="187" class="muted">12 分钟前 · 1:1 方图</text>
+  <rect x="350" y="153" width="94" height="28" rx="14" fill="#17191D"/>
+  <text x="397" y="171" text-anchor="middle" fill="white" font-size="9.5" font-weight="650">继续这个生成</text>
+  <path d="M432 193L438 199M438 193L432 199" stroke="#A2A7AE" stroke-width="1.3" stroke-linecap="round"/>
+
+  <!-- Product asset card -->
+  <rect x="96" y="230" width="368" height="188" rx="12" fill="#FFFFFF" stroke="#E5E6E8"/>
+  <rect x="108" y="244" width="26" height="26" rx="8" fill="#F1F2F3"/>
+  <rect x="115" y="250" width="12" height="11" rx="2" stroke="#6E7580" stroke-width="1.2"/>
+  <path d="M117 259L120 256L122 258L125 255" stroke="#6E7580" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="143" y="255" class="label">产品素材</text>
+  <text x="143" y="271" class="muted">上传白底图，建议 1–4 张</text>
+
+  <rect x="108" y="282" width="344" height="90" rx="9" fill="#FAFAF9" stroke="#CBCFD3" stroke-dasharray="4 3"/>
+  <path d="M280 308V326M273 315L280 308L287 315" stroke="#6D747D" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="280" y="343" text-anchor="middle" class="body">拖入图片或从素材库选择</text>
+  <text x="280" y="359" text-anchor="middle" class="tiny">图片不是越多越好，上传必要的几张即可</text>
+
+  <text x="108" y="393" class="tiny">最近上传</text>
+  <rect x="173" y="379" width="30" height="28" rx="6" fill="#EEF0F2" stroke="#D9DCDF"/>
+  <circle cx="188" cy="393" r="7" fill="url(#charger)"/>
+  <circle cx="188" cy="393" r="3.5" fill="#CED7DF"/>
+  <circle cx="198" cy="383" r="5" fill="#17191D"/>
+  <path d="M196 383L198 385L201 381" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Prompt card -->
+  <rect x="96" y="430" width="368" height="188" rx="12" fill="#FFFFFF" stroke="#E5E6E8"/>
+  <rect x="108" y="444" width="26" height="26" rx="8" fill="#F1F2F3"/>
+  <path d="M116 457H126M121 452V462" stroke="#6E7580" stroke-width="1.3" stroke-linecap="round"/>
+  <text x="143" y="455" class="label">设计简报</text>
+  <rect x="199" y="444" width="42" height="18" rx="9" fill="#FFF3D7"/>
+  <text x="220" y="456.5" text-anchor="middle" fill="#A96800" font-size="8.5" font-weight="650">专业版</text>
+  <circle cx="440" cy="456" r="12" fill="#F5F6F6"/>
+  <path d="M436 455A5 5 0 1 0 438 451M438 451H434M438 451V447" stroke="#8D939B" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="108" y="480" width="344" height="112" rx="9" fill="#F7F7F6" stroke="#E2E4E6"/>
+  <text x="120" y="500" class="body">极简科技感；深色背景，突出磁吸充电器的</text>
+  <text x="120" y="517" class="body">金属边缘与蓝色呼吸灯。标题强调“一贴即合，</text>
+  <text x="120" y="534" class="body">快速补能”，画面保留足够留白用于平台裁切。</text>
+  <rect x="120" y="552" width="62" height="22" rx="11" fill="#FFFFFF" stroke="#DDE0E3"/>
+  <text x="151" y="566.5" text-anchor="middle" class="tiny">一键优化</text>
+  <text x="440" y="579" text-anchor="end" class="tiny">52 / 300</text>
+
+  <!-- Promotion card -->
+  <rect x="96" y="630" width="368" height="118" rx="12" fill="#FFFDF8" stroke="#F0D999"/>
+  <rect x="108" y="644" width="26" height="26" rx="8" fill="#FFF3D2"/>
+  <path d="M115 654L126 650V662L115 658V654Z" stroke="#D68A00" stroke-width="1.2" stroke-linejoin="round"/>
+  <text x="143" y="655" class="label">促销信息</text>
+  <text x="143" y="671" class="muted">可选 · 用于自动生成营销文案</text>
+  <rect x="108" y="682" width="344" height="52" rx="9" fill="#FFFFFF" stroke="#F2E4BB"/>
+  <text x="120" y="703" class="body">限时活动：第二件半价，前 100 名赠收纳袋</text>
+  <text x="440" y="722" text-anchor="end" class="tiny">22 / 300</text>
+
+  <!-- Model and output settings -->
+  <rect x="96" y="760" width="368" height="172" rx="12" fill="#FFFFFF" stroke="#E5E6E8"/>
+  <text x="108" y="783" class="label">输出设置</text>
+  <text x="108" y="806" class="tiny">输出语言</text>
+  <rect x="108" y="816" width="344" height="32" rx="8" fill="#F6F6F5" stroke="#E2E4E6"/>
+  <text x="120" y="836" class="body">中文</text>
+  <path d="M438 828L442 832L446 828" stroke="#8E949C" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="108" y="870" class="tiny">模型</text>
+  <text x="292" y="870" class="tiny">宽高比</text>
+  <rect x="108" y="880" width="172" height="34" rx="8" fill="#F6F6F5" stroke="#E2E4E6"/>
+  <circle cx="121" cy="897" r="3" fill="#31C685"/>
+  <text x="130" y="901" fill="#3B4149" font-size="9.5">GPT Image 2.5</text>
+  <path d="M266 893L270 897L274 893" stroke="#8E949C" stroke-width="1.1" stroke-linecap="round"/>
+  <rect x="292" y="880" width="160" height="34" rx="8" fill="#F6F6F5" stroke="#E2E4E6"/>
+  <text x="304" y="901" fill="#3B4149" font-size="9.5">1:1 方图</text>
+  <path d="M438 893L442 897L446 893" stroke="#8E949C" stroke-width="1.1" stroke-linecap="round"/>
+
+  <!-- Right preview canvas -->
+  <rect x="492" y="128" width="924" height="804" rx="16" fill="#FFFFFF" stroke="#E1E3E5"/>
+  <g clip-path="url(#canvas-clip)">
+    <rect x="493" y="129" width="922" height="802" fill="url(#dot-grid)" opacity="0.4"/>
+  </g>
+  <text x="520" y="160" class="title">实时预览</text>
+  <text x="520" y="179" class="muted">先上传产品图并填写简报，再开始分析与生成</text>
+
+  <g transform="translate(520 196)">
+    <rect width="68" height="30" rx="15" fill="#17191D"/>
+    <rect x="12" y="9" width="12" height="12" rx="2" stroke="white" stroke-width="1.1"/>
+    <path d="M14 18L17 15L19 17L22 14" stroke="white" stroke-width="1" stroke-linecap="round"/>
+    <text x="45" y="19" text-anchor="middle" fill="white" font-size="10" font-weight="650">图片</text>
+    <rect x="76" width="100" height="30" rx="15" fill="#FFFFFF" stroke="#E0E2E4"/>
+    <text x="126" y="19" text-anchor="middle" fill="#6F7680" font-size="10">富文本</text>
+    <rect x="140" y="7" width="27" height="16" rx="8" fill="#FFF3D7"/>
+    <text x="153.5" y="18" text-anchor="middle" fill="#A96800" font-size="7.5">Beta</text>
+  </g>
+  <rect x="1310" y="196" width="78" height="30" rx="15" fill="#FFFFFF" stroke="#E0E2E4"/>
+  <path d="M1323 211H1331M1327 207V215" stroke="#747B84" stroke-width="1.1" stroke-linecap="round"/>
+  <text x="1356" y="215" text-anchor="middle" fill="#676E77" font-size="9.5">收起左侧</text>
+
+  <path d="M520 244H1388" stroke="#ECEDEF"/>
+  <text x="954" y="263" text-anchor="middle" class="tiny">预览结果 · 1:1 方图</text>
+
+  <!-- Hero preview card -->
+  <g filter="url(#shadow-lg)">
+    <rect x="650" y="284" width="608" height="500" rx="18" fill="#FFFFFF"/>
+    <rect x="670" y="304" width="568" height="404" rx="13" fill="url(#hero-bg)"/>
+  </g>
+  <circle cx="1135" cy="382" r="120" fill="url(#glow)"/>
+  <circle cx="1083" cy="499" r="114" fill="#7D8B97" opacity="0.22"/>
+  <g transform="translate(1028 444) rotate(-16)">
+    <rect width="178" height="178" rx="48" fill="#0B0D11" opacity="0.26" transform="translate(8 14)"/>
+    <circle cx="89" cy="89" r="82" fill="url(#charger)" stroke="#EDF2F5" stroke-width="3"/>
+    <circle cx="89" cy="89" r="64" fill="#DBE3E9" stroke="#AAB6C0" stroke-width="2"/>
+    <circle cx="89" cy="89" r="36" fill="#C9D3DB"/>
+    <circle cx="89" cy="89" r="21" fill="#F3F6F8"/>
+    <path d="M84 78H96L91 88H101L84 105L89 92H78L84 78Z" fill="#55C9EB"/>
+    <circle cx="146" cy="89" r="4" fill="#55C9EB"/>
+  </g>
+  <text x="708" y="370" fill="#FFFFFF" font-size="16" font-weight="600" letter-spacing="2">GAN65 MAGNETIC</text>
+  <text x="706" y="417" fill="#FFFFFF" font-size="44" font-weight="800">一贴即合</text>
+  <text x="706" y="465" fill="#CFF6FF" font-size="44" font-weight="800">快速补能</text>
+  <text x="710" y="503" fill="#D7E2EA" font-size="13">智能温控 · 强力磁吸 · 轻薄随行</text>
+  <rect x="710" y="540" width="118" height="34" rx="17" fill="#FFFFFF"/>
+  <text x="769" y="562" text-anchor="middle" fill="#171A1F" font-size="11" font-weight="700">限时第二件半价</text>
+  <text x="710" y="662" fill="#D8E1E7" font-size="10">65W FAST CHARGE</text>
+  <path d="M710 675H806" stroke="#8EDFF4" stroke-width="2"/>
+
+  <text x="674" y="735" fill="#20242A" font-size="13" font-weight="700">主图方案 01</text>
+  <text x="674" y="754" class="muted">科技感 · 1:1 方图 · GPT Image 2.5</text>
+  <circle cx="1150" cy="741" r="15" fill="#F4F5F6"/>
+  <path d="M1144 741H1156M1150 735V747" stroke="#777E87" stroke-width="1.2" stroke-linecap="round"/>
+  <circle cx="1188" cy="741" r="15" fill="#F4F5F6"/>
+  <path d="M1183 738H1193V747H1183V738ZM1185 735H1191" stroke="#777E87" stroke-width="1.1" stroke-linejoin="round"/>
+  <circle cx="1226" cy="741" r="15" fill="#F4F5F6"/>
+  <path d="M1222 741L1226 745L1232 737" stroke="#777E87" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Prompt refinement strip -->
+  <rect x="650" y="804" width="608" height="54" rx="12" fill="#17191D"/>
+  <rect x="664" y="815" width="32" height="32" rx="9" fill="#FFFFFF"/>
+  <path d="M674 825H686M680 819V831" stroke="#17191D" stroke-width="1.4" stroke-linecap="round"/>
+  <text x="708" y="827" fill="#FFFFFF" font-size="11" font-weight="650">主图已生成，可以继续精修</text>
+  <text x="708" y="843" fill="#9298A1" font-size="9">调整标题、背景、产品位置或促销信息</text>
+  <rect x="1134" y="815" width="110" height="32" rx="16" fill="#FFFFFF"/>
+  <text x="1189" y="835" text-anchor="middle" fill="#17191D" font-size="10" font-weight="700">生成全部方案 →</text>
+
+  <!-- Detail-mode teaser -->
+  <rect x="520" y="882" width="868" height="34" rx="10" fill="#F7F7F6" stroke="#E4E5E7"/>
+  <circle cx="538" cy="899" r="8" fill="#FFFFFF" stroke="#D8DBDE"/>
+  <path d="M534 899H542M538 895V903" stroke="#777E87" stroke-width="1" stroke-linecap="round"/>
+  <text x="553" y="902" fill="#595F68" font-size="9.5">切换到「详情图」后，可基于本次配置继续生成首屏、卖点、场景、参数等模块</text>
+  <rect x="1301" y="890" width="74" height="18" rx="9" fill="#FFFFFF" stroke="#DDE0E3"/>
+  <text x="1338" y="902.5" text-anchor="middle" fill="#606771" font-size="8.5">8 个模块</text>
+
+  <!-- Scroll affordance and primary action -->
+  <rect x="458" y="146" width="3" height="768" rx="1.5" fill="#ECEDEF"/>
+  <rect x="458" y="314" width="3" height="144" rx="1.5" fill="#C8CCD1"/>
+  <rect x="112" y="914" width="340" height="2" fill="#FFFFFF" opacity="0"/>
+</svg>

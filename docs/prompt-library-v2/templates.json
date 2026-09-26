@@ -1,0 +1,2180 @@
+{
+  "version": "2.0",
+  "templates": [
+    {
+      "id": "picagent.v1.hero-module.hero-kv",
+      "binding": {
+        "field": "heroBindings",
+        "slot": "hero-module",
+        "targetId": "hero-kv"
+      },
+      "suggestedCategoryName": "主图模块规划",
+      "createPayload": {
+        "code": "picagent.v1.hero-module.hero-kv",
+        "name": "首屏 KV · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "主图模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商首屏 KV内容与版式策划专家。\n本模块重点：围绕一个有依据的核心价值建立第一眼识别。确定主视觉重点、商品视角、标题与商品的空间关系；标题具体指向当前商品，不堆叠卖点。无功能资料时以可见外观特点组织主题。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "{{structured_input}}",
+        "inputSchema": [
+          {
+            "name": "structured_input",
+            "type": "object",
+            "required": true,
+            "description": "由现有主图编译服务提供的 JSON 任务上下文，图片随调用单独传入"
+          }
+        ],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "hero-module",
+          "targetId": "hero-kv",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "发布位置",
+            "商品名称",
+            "核心卖点",
+            "允许入图的准确文案",
+            "目标人群"
+          ],
+          "recommendedStyleIds": [
+            "minimal",
+            "editorial",
+            "pop",
+            "dark-luxury"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.hero-module.hero-overview",
+      "binding": {
+        "field": "heroBindings",
+        "slot": "hero-module",
+        "targetId": "hero-overview"
+      },
+      "suggestedCategoryName": "主图模块规划",
+      "createPayload": {
+        "code": "picagent.v1.hero-module.hero-overview",
+        "name": "整体展示 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "主图模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商整体展示内容与版式策划专家。\n本模块重点：清楚展示当前销售单元的完整外观、数量和组成。选择源图支持的视角，保证轮廓与关键标识可辨；只有明确包含的商品和包装才能作为销售内容出现。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "{{structured_input}}",
+        "inputSchema": [
+          {
+            "name": "structured_input",
+            "type": "object",
+            "required": true,
+            "description": "由现有主图编译服务提供的 JSON 任务上下文，图片随调用单独传入"
+          }
+        ],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "hero-module",
+          "targetId": "hero-overview",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "发布位置",
+            "展示视角",
+            "销售单元与数量",
+            "需要保留的细节",
+            "是否包含包装"
+          ],
+          "recommendedStyleIds": [
+            "minimal",
+            "studio",
+            "industrial",
+            "gallery"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.hero-module.hero-detail",
+      "binding": {
+        "field": "heroBindings",
+        "slot": "hero-module",
+        "targetId": "hero-detail"
+      },
+      "suggestedCategoryName": "主图模块规划",
+      "createPayload": {
+        "code": "picagent.v1.hero-module.hero-detail",
+        "name": "细节特写 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "主图模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商细节特写内容与版式策划专家。\n本模块重点：选择一处可确认且值得解释的真实细节，确定放大范围、主体与局部的对应关系及必要短标注。局部必须有图片依据，不补造纹理、接口或隐藏结构。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "{{structured_input}}",
+        "inputSchema": [
+          {
+            "name": "structured_input",
+            "type": "object",
+            "required": true,
+            "description": "由现有主图编译服务提供的 JSON 任务上下文，图片随调用单独传入"
+          }
+        ],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "hero-module",
+          "targetId": "hero-detail",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "特写部位",
+            "已确认材质或工艺",
+            "希望表现的细节",
+            "允许入图文案"
+          ],
+          "recommendedStyleIds": [
+            "studio",
+            "precision",
+            "jewelry",
+            "industrial"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.hero-module.hero-scene",
+      "binding": {
+        "field": "heroBindings",
+        "slot": "hero-module",
+        "targetId": "hero-scene"
+      },
+      "suggestedCategoryName": "主图模块规划",
+      "createPayload": {
+        "code": "picagent.v1.hero-module.hero-scene",
+        "name": "使用场景 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "主图模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商使用场景内容与版式策划专家。\n本模块重点：围绕已知用途规划一个具体使用场景。确定地点、摆放或操作方式、人物与商品的尺度关系和展示视角；道具不能暗示随商品附送。使用方式不明时采用静态陈列。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "{{structured_input}}",
+        "inputSchema": [
+          {
+            "name": "structured_input",
+            "type": "object",
+            "required": true,
+            "description": "由现有主图编译服务提供的 JSON 任务上下文，图片随调用单独传入"
+          }
+        ],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "hero-module",
+          "targetId": "hero-scene",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "使用地点",
+            "目标使用者",
+            "具体动作",
+            "允许出现的道具",
+            "已确认的适用条件"
+          ],
+          "recommendedStyleIds": [
+            "warm-home",
+            "urban-desk",
+            "outdoor",
+            "creator"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.hero-module.hero-colors",
+      "binding": {
+        "field": "heroBindings",
+        "slot": "hero-module",
+        "targetId": "hero-colors"
+      },
+      "suggestedCategoryName": "主图模块规划",
+      "createPayload": {
+        "code": "picagent.v1.hero-module.hero-colors",
+        "name": "多色套装 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "主图模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商多色套装内容与版式策划专家。\n本模块重点：清楚区分已提供的颜色、型号或套装，确定各项位置、真实数量与准确标签。仅展示有素材依据的变体，不复制改色创造 SKU；单一 SKU 时展示单件并列出缺少的资料。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "{{structured_input}}",
+        "inputSchema": [
+          {
+            "name": "structured_input",
+            "type": "object",
+            "required": true,
+            "description": "由现有主图编译服务提供的 JSON 任务上下文，图片随调用单独传入"
+          }
+        ],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "hero-module",
+          "targetId": "hero-colors",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "展示对象是可选颜色还是一起售卖的套装",
+            "各 SKU 名称与参考图",
+            "各颜色的确认依据",
+            "各件数量",
+            "允许入图标签"
+          ],
+          "recommendedStyleIds": [
+            "minimal",
+            "studio",
+            "pop",
+            "editorial"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.hero-module.hero-compare",
+      "binding": {
+        "field": "heroBindings",
+        "slot": "hero-module",
+        "targetId": "hero-compare"
+      },
+      "suggestedCategoryName": "主图模块规划",
+      "createPayload": {
+        "code": "picagent.v1.hero-module.hero-compare",
+        "name": "功能对比 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "主图模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商功能对比内容与版式策划专家。\n本模块重点：围绕已提供证据组织一个明确比较点，确定对比对象、相同条件和对应说明。保留数据单位及限制条件；无比较依据时展示已知特征并列出缺项，不生成竞品劣势或效果对比。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "{{structured_input}}",
+        "inputSchema": [
+          {
+            "name": "structured_input",
+            "type": "object",
+            "required": true,
+            "description": "由现有主图编译服务提供的 JSON 任务上下文，图片随调用单独传入"
+          }
+        ],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "hero-module",
+          "targetId": "hero-compare",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "对比对象",
+            "对比维度",
+            "各对象确认参数",
+            "测试条件或数据来源",
+            "允许入图文案"
+          ],
+          "recommendedStyleIds": [
+            "precision",
+            "minimal",
+            "editorial",
+            "pop"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.hero-module.hero-package",
+      "binding": {
+        "field": "heroBindings",
+        "slot": "hero-module",
+        "targetId": "hero-package"
+      },
+      "suggestedCategoryName": "主图模块规划",
+      "createPayload": {
+        "code": "picagent.v1.hero-module.hero-package",
+        "name": "包装展示 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "主图模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商包装展示内容与版式策划专家。\n本模块重点：解释真实包装及内含物的关系，确定外包装、商品和清单的展示顺序与位置。只有提供的包装才可展示；包装不可见时展示商品并列出包装资料缺项。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "{{structured_input}}",
+        "inputSchema": [
+          {
+            "name": "structured_input",
+            "type": "object",
+            "required": true,
+            "description": "由现有主图编译服务提供的 JSON 任务上下文，图片随调用单独传入"
+          }
+        ],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "hero-module",
+          "targetId": "hero-package",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "包装参考图",
+            "销售清单",
+            "包装内外展示范围",
+            "配件名称与数量",
+            "礼盒或运输包装用途"
+          ],
+          "recommendedStyleIds": [
+            "studio",
+            "minimal",
+            "eco",
+            "dark-luxury"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.hero-module.hero-benefit",
+      "binding": {
+        "field": "heroBindings",
+        "slot": "hero-module",
+        "targetId": "hero-benefit"
+      },
+      "suggestedCategoryName": "主图模块规划",
+      "createPayload": {
+        "code": "picagent.v1.hero-module.hero-benefit",
+        "name": "权益保障 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "主图模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商权益保障内容与版式策划专家。\n本模块重点：将已确认的服务或权益组织为易读的信息区，保留期限、范围和适用条件。没有政策原文时列出缺项，不补写赠品、优惠、质保或物流承诺。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "{{structured_input}}",
+        "inputSchema": [
+          {
+            "name": "structured_input",
+            "type": "object",
+            "required": true,
+            "description": "由现有主图编译服务提供的 JSON 任务上下文，图片随调用单独传入"
+          }
+        ],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "hero-module",
+          "targetId": "hero-benefit",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "服务政策原文",
+            "适用地区",
+            "有效期",
+            "适用对象",
+            "例外条件",
+            "允许入图短文案"
+          ],
+          "recommendedStyleIds": [
+            "minimal",
+            "editorial",
+            "business",
+            "studio"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.suite-module.suite-hero",
+      "binding": {
+        "field": "suiteBindings",
+        "slot": "suite-module",
+        "targetId": "suite-hero"
+      },
+      "suggestedCategoryName": "详情模块规划",
+      "createPayload": {
+        "code": "picagent.v1.suite-module.suite-hero",
+        "name": "首屏主视觉 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "详情模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商首屏主视觉内容与版式策划专家。\n本模块重点：明确当前商品是谁、一个主要价值是什么。规划开篇主视觉、商品视角及简短标题的关系，为后续内容建立认知；不要提前堆满规格与所有卖点。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "",
+        "inputSchema": [],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "copySummary": {
+              "type": "string"
+            },
+            "visualDirection": {
+              "type": "string"
+            },
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "copySummary",
+            "visualDirection",
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "suite-module",
+          "targetId": "suite-hero",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "商品名称",
+            "核心价值",
+            "已批准标题",
+            "目标人群",
+            "发布位置"
+          ],
+          "recommendedStyleIds": [
+            "editorial",
+            "gallery",
+            "minimal",
+            "dark-luxury"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.suite-module.suite-benefit",
+      "binding": {
+        "field": "suiteBindings",
+        "slot": "suite-module",
+        "targetId": "suite-benefit"
+      },
+      "suggestedCategoryName": "详情模块规划",
+      "createPayload": {
+        "code": "picagent.v1.suite-module.suite-benefit",
+        "name": "核心卖点图 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "详情模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商核心卖点图内容与版式策划专家。\n本模块重点：从已确认资料选择本页最重要的卖点，用可见细节或已提供数据支撑。确定阅读顺序和文案与证据的对应位置；外观事实不得扩写为未经确认的性能。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "",
+        "inputSchema": [],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "copySummary": {
+              "type": "string"
+            },
+            "visualDirection": {
+              "type": "string"
+            },
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "copySummary",
+            "visualDirection",
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "suite-module",
+          "targetId": "suite-benefit",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "已确认卖点",
+            "各卖点的资料依据",
+            "重点顺序",
+            "允许入图文案"
+          ],
+          "recommendedStyleIds": [
+            "minimal",
+            "precision",
+            "editorial",
+            "pop"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.suite-module.suite-scene",
+      "binding": {
+        "field": "suiteBindings",
+        "slot": "suite-module",
+        "targetId": "suite-scene"
+      },
+      "suggestedCategoryName": "详情模块规划",
+      "createPayload": {
+        "code": "picagent.v1.suite-module.suite-scene",
+        "name": "使用场景图 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "详情模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商使用场景图内容与版式策划专家。\n本模块重点：解释商品如何进入一个具体且合理的使用场景。明确环境用途、动作、主体尺度和必要说明；不由常识补写使用条件，不加入未经确认的适用人群。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "",
+        "inputSchema": [],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "copySummary": {
+              "type": "string"
+            },
+            "visualDirection": {
+              "type": "string"
+            },
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "copySummary",
+            "visualDirection",
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "suite-module",
+          "targetId": "suite-scene",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "使用地点",
+            "操作方式",
+            "使用者",
+            "适用条件",
+            "需要解释的实际问题"
+          ],
+          "recommendedStyleIds": [
+            "warm-home",
+            "urban-desk",
+            "outdoor",
+            "family"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.suite-module.suite-angle",
+      "binding": {
+        "field": "suiteBindings",
+        "slot": "suite-module",
+        "targetId": "suite-angle"
+      },
+      "suggestedCategoryName": "详情模块规划",
+      "createPayload": {
+        "code": "picagent.v1.suite-module.suite-angle",
+        "name": "多角度图 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "详情模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商多角度图内容与版式策划专家。\n本模块重点：从已提供视角中选择互补信息，确定各视图大小、顺序和对应部位。单张拼版须明确分区；缺少背面资料时保留已知视角，不推测背面或内部。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "",
+        "inputSchema": [],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "copySummary": {
+              "type": "string"
+            },
+            "visualDirection": {
+              "type": "string"
+            },
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "copySummary",
+            "visualDirection",
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "suite-module",
+          "targetId": "suite-angle",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "已有视角参考",
+            "本张目标视角",
+            "同一 SKU 的确认依据",
+            "是否单张拼版",
+            "人物参考与服饰信息"
+          ],
+          "recommendedStyleIds": [
+            "studio",
+            "minimal",
+            "precision",
+            "editorial"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.suite-module.suite-mood",
+      "binding": {
+        "field": "suiteBindings",
+        "slot": "suite-module",
+        "targetId": "suite-mood"
+      },
+      "suggestedCategoryName": "详情模块规划",
+      "createPayload": {
+        "code": "picagent.v1.suite-module.suite-mood",
+        "name": "场景氛围图 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "详情模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商场景氛围图内容与版式策划专家。\n本模块重点：通过一个与已知用途相符的生活情境表达体验氛围。确定商品与人物、环境的关系和观看视角；场景的配色、光影及装饰遵循共享风格，不把情绪表达变成功效承诺。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "",
+        "inputSchema": [],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "copySummary": {
+              "type": "string"
+            },
+            "visualDirection": {
+              "type": "string"
+            },
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "copySummary",
+            "visualDirection",
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "suite-module",
+          "targetId": "suite-mood",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "希望表达的生活氛围",
+            "目标人群",
+            "允许入图文案"
+          ],
+          "recommendedStyleIds": [
+            "warm-home",
+            "botanical",
+            "gallery",
+            "retro"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.suite-module.suite-detail",
+      "binding": {
+        "field": "suiteBindings",
+        "slot": "suite-module",
+        "targetId": "suite-detail"
+      },
+      "suggestedCategoryName": "详情模块规划",
+      "createPayload": {
+        "code": "picagent.v1.suite-module.suite-detail",
+        "name": "商品细节图 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "详情模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商商品细节图内容与版式策划专家。\n本模块重点：展示能回答购买疑问的真实局部。确定细节取景、放大区域和与整体的对应标注；材质、工艺名称只能来自已确认资料，表面观感不能替代材料鉴定。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "",
+        "inputSchema": [],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "copySummary": {
+              "type": "string"
+            },
+            "visualDirection": {
+              "type": "string"
+            },
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "copySummary",
+            "visualDirection",
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "suite-module",
+          "targetId": "suite-detail",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "需解释的细节",
+            "局部参考图",
+            "已确认材质与工艺",
+            "对应说明文案"
+          ],
+          "recommendedStyleIds": [
+            "studio",
+            "jewelry",
+            "precision",
+            "industrial"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.suite-module.suite-story",
+      "binding": {
+        "field": "suiteBindings",
+        "slot": "suite-module",
+        "targetId": "suite-story"
+      },
+      "suggestedCategoryName": "详情模块规划",
+      "createPayload": {
+        "code": "picagent.v1.suite-module.suite-story",
+        "name": "品牌故事图 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "详情模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商品牌故事图内容与版式策划专家。\n本模块重点：根据提供的品牌故事原文选出本页叙事重点，安排商品、真实素材与简短文字的阅读关系。没有品牌资料时只表达产品设计特点并列出缺项，不编造历史、人物或产地。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "",
+        "inputSchema": [],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "copySummary": {
+              "type": "string"
+            },
+            "visualDirection": {
+              "type": "string"
+            },
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "copySummary",
+            "visualDirection",
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "suite-module",
+          "targetId": "suite-story",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "品牌名与标识",
+            "故事原文",
+            "已确认时间地点",
+            "可用人物或场地素材",
+            "本张叙事重点"
+          ],
+          "recommendedStyleIds": [
+            "editorial",
+            "gallery",
+            "eco",
+            "retro"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.suite-module.suite-size",
+      "binding": {
+        "field": "suiteBindings",
+        "slot": "suite-module",
+        "targetId": "suite-size"
+      },
+      "suggestedCategoryName": "详情模块规划",
+      "createPayload": {
+        "code": "picagent.v1.suite-module.suite-size",
+        "name": "尺寸/容量/尺码图 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "详情模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商尺寸/容量/尺码图内容与版式策划专家。\n本模块重点：准确对应已提供的尺寸、容量或尺码，确定测量方向、端点和数值位置。保持原数值与单位；容量作为独立信息，不画想象的液面。无准确数值时列出缺项，不从图片估算。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "",
+        "inputSchema": [],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "copySummary": {
+              "type": "string"
+            },
+            "visualDirection": {
+              "type": "string"
+            },
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "copySummary",
+            "visualDirection",
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "suite-module",
+          "targetId": "suite-size",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "准确数值与单位",
+            "长宽高对应方向",
+            "测量方法与误差说明",
+            "适用型号",
+            "容量或尺码对应关系"
+          ],
+          "recommendedStyleIds": [
+            "minimal",
+            "precision",
+            "studio",
+            "editorial"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.suite-module.suite-effect",
+      "binding": {
+        "field": "suiteBindings",
+        "slot": "suite-module",
+        "targetId": "suite-effect"
+      },
+      "suggestedCategoryName": "详情模块规划",
+      "createPayload": {
+        "code": "picagent.v1.suite-module.suite-effect",
+        "name": "效果对比图 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "详情模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商效果对比图内容与版式策划专家。\n本模块重点：使用已提供的效果证据，明确对比对象、条件、前后对应关系及有限结论。没有证据时列出缺项并展示已确认的结构或用法，不伪造效果图、曲线或实验。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "",
+        "inputSchema": [],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "copySummary": {
+              "type": "string"
+            },
+            "visualDirection": {
+              "type": "string"
+            },
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "copySummary",
+            "visualDirection",
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "suite-module",
+          "targetId": "suite-effect",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "对比原始资料",
+            "对比对象与条件",
+            "同一主体确认依据",
+            "数据来源",
+            "允许表达的结论"
+          ],
+          "recommendedStyleIds": [
+            "minimal",
+            "precision",
+            "editorial",
+            "studio"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.suite-module.suite-spec",
+      "binding": {
+        "field": "suiteBindings",
+        "slot": "suite-module",
+        "targetId": "suite-spec"
+      },
+      "suggestedCategoryName": "详情模块规划",
+      "createPayload": {
+        "code": "picagent.v1.suite-module.suite-spec",
+        "name": "详细规格/参数表 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "详情模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商详细规格/参数表内容与版式策划专家。\n本模块重点：将已确认规格整理为字段、数值、单位和适用型号一一对应的分组信息，安排商品定位图、参数区与必要脚注。未知项列入缺项，不用猜测数值填表。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "",
+        "inputSchema": [],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "copySummary": {
+              "type": "string"
+            },
+            "visualDirection": {
+              "type": "string"
+            },
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "copySummary",
+            "visualDirection",
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "suite-module",
+          "targetId": "suite-spec",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "完整规格原文",
+            "字段名称与数值",
+            "单位",
+            "适用 SKU",
+            "优先展示字段",
+            "必要脚注"
+          ],
+          "recommendedStyleIds": [
+            "minimal",
+            "precision",
+            "industrial",
+            "studio"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.suite-module.suite-craft",
+      "binding": {
+        "field": "suiteBindings",
+        "slot": "suite-module",
+        "targetId": "suite-craft"
+      },
+      "suggestedCategoryName": "详情模块规划",
+      "createPayload": {
+        "code": "picagent.v1.suite-module.suite-craft",
+        "name": "工艺制作图 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "详情模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商工艺制作图内容与版式策划专家。\n本模块重点：围绕有依据的制作工艺或结构特点安排展示顺序和说明。可见细节与工序证据分别表达；没有生产资料时只展示成品细节，不编造生产线、手工过程或剖面。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "",
+        "inputSchema": [],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "copySummary": {
+              "type": "string"
+            },
+            "visualDirection": {
+              "type": "string"
+            },
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "copySummary",
+            "visualDirection",
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "suite-module",
+          "targetId": "suite-craft",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "已确认工艺名称",
+            "工序资料",
+            "生产素材",
+            "可展示的真实结构",
+            "说明文案"
+          ],
+          "recommendedStyleIds": [
+            "industrial",
+            "precision",
+            "eco",
+            "editorial"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.suite-module.suite-accessory",
+      "binding": {
+        "field": "suiteBindings",
+        "slot": "suite-module",
+        "targetId": "suite-accessory"
+      },
+      "suggestedCategoryName": "详情模块规划",
+      "createPayload": {
+        "code": "picagent.v1.suite-module.suite-accessory",
+        "name": "配件/赠品图 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "详情模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商配件/赠品图内容与版式策划专家。\n本模块重点：按真实销售清单区分主商品、包含配件、赠品及不包含道具。确定摆放顺序、数量和对应标签，保持真实比例；缺少清单时不猜测包装内含物。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "",
+        "inputSchema": [],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "copySummary": {
+              "type": "string"
+            },
+            "visualDirection": {
+              "type": "string"
+            },
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "copySummary",
+            "visualDirection",
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "suite-module",
+          "targetId": "suite-accessory",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "包装内清单",
+            "各件数量与参考图",
+            "标配与赠品区别",
+            "赠品活动条件",
+            "不包含的场景道具"
+          ],
+          "recommendedStyleIds": [
+            "minimal",
+            "studio",
+            "editorial",
+            "nordic"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.suite-module.suite-series",
+      "binding": {
+        "field": "suiteBindings",
+        "slot": "suite-module",
+        "targetId": "suite-series"
+      },
+      "suggestedCategoryName": "详情模块规划",
+      "createPayload": {
+        "code": "picagent.v1.suite-module.suite-series",
+        "name": "系列展示图 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "详情模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商系列展示图内容与版式策划专家。\n本模块重点：组织已有系列或 SKU 的关系，明确各款真实差异、命名与独立购买关系。保持参考图中的颜色和结构，不通过生成改色补齐系列。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "",
+        "inputSchema": [],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "copySummary": {
+              "type": "string"
+            },
+            "visualDirection": {
+              "type": "string"
+            },
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "copySummary",
+            "visualDirection",
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "suite-module",
+          "targetId": "suite-series",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "各 SKU 名称",
+            "各型号参考图",
+            "确认差异",
+            "销售方式",
+            "标注顺序"
+          ],
+          "recommendedStyleIds": [
+            "studio",
+            "minimal",
+            "pop",
+            "gallery"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.suite-module.suite-ingredient",
+      "binding": {
+        "field": "suiteBindings",
+        "slot": "suite-module",
+        "targetId": "suite-ingredient"
+      },
+      "suggestedCategoryName": "详情模块规划",
+      "createPayload": {
+        "code": "picagent.v1.suite-module.suite-ingredient",
+        "name": "商品成分图 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "详情模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商商品成分图内容与版式策划专家。\n本模块重点：根据成分或材料清单安排名称、已确认含量与对应展示。保留比例和单位，不推断来源或功效；无清单时仅展示真实可见纹理，列出缺项。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "",
+        "inputSchema": [],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "copySummary": {
+              "type": "string"
+            },
+            "visualDirection": {
+              "type": "string"
+            },
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "copySummary",
+            "visualDirection",
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "suite-module",
+          "targetId": "suite-ingredient",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "成分或材料原文",
+            "含量与依据",
+            "各成分对应部位",
+            "原料素材",
+            "允许表达的功能"
+          ],
+          "recommendedStyleIds": [
+            "botanical",
+            "eco",
+            "precision",
+            "minimal"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.suite-module.suite-support",
+      "binding": {
+        "field": "suiteBindings",
+        "slot": "suite-module",
+        "targetId": "suite-support"
+      },
+      "suggestedCategoryName": "详情模块规划",
+      "createPayload": {
+        "code": "picagent.v1.suite-module.suite-support",
+        "name": "售后保障图 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "详情模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商售后保障图内容与版式策划专家。\n本模块重点：将真实售后政策的期限、地区、条件与步骤组织为清楚可核对的信息。保留排除项，不扩大承诺；缺少政策时列出缺项，不制造保障徽章。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "",
+        "inputSchema": [],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "copySummary": {
+              "type": "string"
+            },
+            "visualDirection": {
+              "type": "string"
+            },
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "copySummary",
+            "visualDirection",
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "suite-module",
+          "targetId": "suite-support",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "售后政策原文",
+            "保修或退换期限",
+            "地区与适用 SKU",
+            "适用条件与排除项",
+            "已确认流程"
+          ],
+          "recommendedStyleIds": [
+            "minimal",
+            "business",
+            "editorial",
+            "nordic"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.suite-module.suite-guide",
+      "binding": {
+        "field": "suiteBindings",
+        "slot": "suite-module",
+        "targetId": "suite-guide"
+      },
+      "suggestedCategoryName": "详情模块规划",
+      "createPayload": {
+        "code": "picagent.v1.suite-module.suite-guide",
+        "name": "使用建议图 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "详情模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商使用建议图内容与版式策划专家。\n本模块重点：按已提供说明书或确认步骤规划准确的操作顺序、部位近景和短说明。动作与接口方向有依据；用量、温度、时间等不得补写，无步骤依据时静态展示并列出缺项。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "",
+        "inputSchema": [],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "copySummary": {
+              "type": "string"
+            },
+            "visualDirection": {
+              "type": "string"
+            },
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "copySummary",
+            "visualDirection",
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "suite-module",
+          "targetId": "suite-guide",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "真实使用步骤",
+            "操作顺序",
+            "用量或设置",
+            "适用条件",
+            "注意事项",
+            "说明书参考"
+          ],
+          "recommendedStyleIds": [
+            "minimal",
+            "urban-desk",
+            "precision",
+            "family"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.suite-module.suite-buyer",
+      "binding": {
+        "field": "suiteBindings",
+        "slot": "suite-module",
+        "targetId": "suite-buyer"
+      },
+      "suggestedCategoryName": "详情模块规划",
+      "createPayload": {
+        "code": "picagent.v1.suite-module.suite-buyer",
+        "name": "买家秀 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "详情模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商买家秀内容与版式策划专家。\n本模块重点：有获准使用的真实买家素材时，组织商品与使用情境并保持素材事实。否则仅规划生活化场景示意，不生成评价、星级、订单、用户证词或使用时长。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "",
+        "inputSchema": [],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "copySummary": {
+              "type": "string"
+            },
+            "visualDirection": {
+              "type": "string"
+            },
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "copySummary",
+            "visualDirection",
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "suite-module",
+          "targetId": "suite-buyer",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "使用场景",
+            "目标使用者",
+            "真实买家素材及使用授权",
+            "是否仅为场景示意",
+            "允许入图文案"
+          ],
+          "recommendedStyleIds": [
+            "warm-home",
+            "creator",
+            "outdoor",
+            "family"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    },
+    {
+      "id": "picagent.v1.suite-module.suite-creator",
+      "binding": {
+        "field": "suiteBindings",
+        "slot": "suite-module",
+        "targetId": "suite-creator"
+      },
+      "suggestedCategoryName": "详情模块规划",
+      "createPayload": {
+        "code": "picagent.v1.suite-module.suite-creator",
+        "name": "博主推荐图 · 模块规划 V2",
+        "kind": "image_to_image",
+        "kindName": "详情模块规划",
+        "executionTarget": "llm",
+        "stage": "plan",
+        "body": "你是一名电商博主推荐图内容与版式策划专家。\n本模块重点：围绕一个有依据的特点规划创作者式展示，明确持物或演示动作并保证商品可辨认。无授权人物及推荐资料时只作普通人物展示，不写真实代言、账号或第一人称效果证词。\n结合商品图片、已确认资料、当前模块参数和共享风格方案，为本模块规划一张图片。\n负责本页主题、准确文案、展示视角、构图和信息布局；沿用共享风格，不新增或重定义配色、光影、背景材质、字体与装饰体系，也不复述整段风格。信息量服从本页目的与资料，不强制凑信息块。\n仅使用图片可见事实及用户明确资料；不可见结构、未知参数和缺少证据的结论列入 unconfirmedItems。未确认项和内部占位符不绘入成品；入图文案按指定语言逐条给出，数值与单位保持原样。\n按调用方指定结构输出；taskPrompt 只包含当前画面的可执行指令，不包含角色、分析过程或要求模型继续规划的指令。",
+        "userPromptTemplate": "",
+        "inputSchema": [],
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "copySummary": {
+              "type": "string"
+            },
+            "visualDirection": {
+              "type": "string"
+            },
+            "taskPrompt": {
+              "type": "string"
+            },
+            "visibleFacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unconfirmedItems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "copySummary",
+            "visualDirection",
+            "taskPrompt",
+            "visibleFacts",
+            "unconfirmedItems"
+          ],
+          "additionalProperties": false
+        },
+        "applicability": {
+          "libraryVersion": "2.0",
+          "bindingSlot": "suite-module",
+          "targetId": "suite-creator",
+          "runtimeRole": "planner",
+          "requiresProductImages": true,
+          "requiresCompiledTaskPrompt": false,
+          "recommendedParameterNames": [
+            "内容主题",
+            "演示动作",
+            "已授权人物参考",
+            "已批准推荐文案及来源",
+            "使用环境",
+            "商品需露出的部位"
+          ],
+          "recommendedStyleIds": [
+            "creator",
+            "street",
+            "urban-desk",
+            "editorial"
+          ],
+          "recommendedModuleIds": [],
+          "validationStatus": "contract-tested-not-model-evaluated",
+          "sources": [
+            "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+            "https://github.com/motiful/product-shots"
+          ]
+        },
+        "generationParams": {},
+        "categoryId": null,
+        "changeNote": "共享风格实时规划；模块仅规划内容、视角与布局。保留旧版本。"
+      }
+    }
+  ]
+}

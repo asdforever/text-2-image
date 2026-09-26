@@ -1,0 +1,26 @@
+[
+  {
+    "category": "electronics",
+    "modules": [
+      {"taskId": "overview", "productPresence": "full", "layoutFamily": "centered_hero", "informationQuestion": "这是什么？", "evidence": ["visible_device"]},
+      {"taskId": "detail", "productPresence": "detail", "layoutFamily": "detail_annotation", "informationQuestion": "关键接口在哪里？", "evidence": ["visible_port"]},
+      {"taskId": "context", "productPresence": "context", "layoutFamily": "scene_caption_cluster", "informationQuestion": "它如何融入使用场景？", "evidence": ["visible_usage_context"]}
+    ]
+  },
+  {
+    "category": "home_goods",
+    "modules": [
+      {"taskId": "overview", "productPresence": "full", "layoutFamily": "centered_hero", "informationQuestion": "整体是什么？", "evidence": ["visible_form"]},
+      {"taskId": "scale", "productPresence": "context", "layoutFamily": "scene_caption_cluster", "informationQuestion": "实际尺寸如何理解？", "evidence": ["provided_dimensions"]},
+      {"taskId": "detail", "productPresence": "detail", "layoutFamily": "detail_annotation", "informationQuestion": "材质细节如何？", "evidence": ["visible_material"]}
+    ]
+  },
+  {
+    "category": "beauty_packaging",
+    "modules": [
+      {"taskId": "overview", "productPresence": "full", "layoutFamily": "centered_hero", "informationQuestion": "包装识别是什么？", "evidence": ["visible_packaging"]},
+      {"taskId": "texture", "productPresence": "detail", "layoutFamily": "detail_annotation", "informationQuestion": "质地和开口如何？", "evidence": ["visible_texture"]},
+      {"taskId": "ritual", "productPresence": "context", "layoutFamily": "scene_caption_cluster", "informationQuestion": "使用步骤如何理解？", "evidence": ["provided_usage_steps"]}
+    ]
+  }
+]
