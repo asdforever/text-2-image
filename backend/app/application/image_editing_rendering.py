@@ -1,5 +1,6 @@
 """图片编辑操作的验证、指令编译和选区保护；纯裁剪不请求模型。"""
 from io import BytesIO
+from itertools import groupby
 import json
 import math
 
@@ -107,23 +108,52 @@ async def execute_operations(source, operations, editor, *, ratio, resolution, c
     validate_operations(operations)
     image = load_image(source)
     edits = [item for item in operations if item["type"] != "crop_resize"]
-    prompt = "本地裁剪与尺寸调整"
-    if edits:
+    # Reject empty brush selections before any earlier text generation can incur cost.
+    for operation in edits:
+        if operation["type"] in {"redraw", "erase"}:
+            operation_mask(image.size, operation)
+    prompts = []
+    # Text regions guide layout, while brush masks define an exact compositing boundary.
+    # Keep consecutive edits together without clipping text to a brush/rectangle mask.
+    for is_text, group in groupby(edits, key=lambda item: item["type"] in {"add_text", "change_text"}):
         mask = Image.new("L", image.size)
         instructions = []
         labels = {"add_text": "添加指定文字", "change_text": "替换指定文字，保留原字体感觉、透视和光影", "redraw": "局部重绘", "erase": "移除选中内容并自然补全背景"}
-        for operation in edits:
-            mask = ImageChops.lighter(mask, operation_mask(image.size, operation))
+        for operation in group:
+            if not is_text:
+                mask = ImageChops.lighter(mask, operation_mask(image.size, operation))
             payload = {key: value for key, value in operation["payload"].items() if key not in {"schemaVersion", "strokes"}}
-            instructions.append(labels[operation["type"]] + "：" + json.dumps(payload, ensure_ascii=False))
-        prompt = "第一张是原图，第二张是选区指引，红色仅标记允许修改的区域，不是输出内容。保持完整画幅、商品结构、选区外文字与构图不变，不改变画面比例。文字按要求精确拼写。只执行以下修改：\n" + "\n".join(instructions)
-        guide = Image.composite(Image.new("RGBA", image.size, "#ff4444"), image, mask.point(lambda v: round(v * .45)))
+            instruction = labels[operation["type"]] + "：" + json.dumps(payload, ensure_ascii=False)
+            if is_text:
+                r = region_of(payload)
+                bounds = [round(r["x"]*image.width), round(r["y"]*image.height), round((r["x"]+r["width"])*image.width), round((r["y"]+r["height"])*image.height)]
+                instruction += "。原图像素位置 [左, 上, 右, 下]：" + json.dumps(bounds)
+                instruction += f"；距左 {r['x']:.1%}，距顶 {r['y']:.1%}，文字总宽不超过画面 {r['width']:.1%}，总高不超过画面 {r['height']:.1%}。"
+            if operation["type"] == "add_text" and "textStyle" not in payload:
+                instruction += "。在指定区域内参考原图风格自动选择字体、字号、颜色和排版，保证文字完整、清晰且自然融入画面；用户明确描述的文字效果优先。"
+            instructions.append(instruction)
         source_png = encode(image)
+        inputs = (ImageEditInput(source_png, "image/png", "原图.png"),)
+        if is_text:
+            guidance = (
+                f"这是待编辑原图，尺寸为 {image.width} × {image.height} 像素。输出完整画幅，保持原图比例。"
+                "region 为相对原图左上角的归一化位置，表示文字排版范围，所有笔画必须完整落在此范围内，不得越界。"
+                "文字必须逐字完整呈现；根据区域大小合理缩小字号或换行，四周留出空白，禁止截字、缺字或把文字压在画面边缘。"
+                "不要绘制选区框、色块底板或辅助标记，除非用户明确要求。"
+                "保留原图商品、包装、原有文字（包括底部文案）、背景、光影和构图；禁止放大商品、移动主体、改变留白或重新设计整张图，仅执行指定文字修改。只执行以下修改：\n"
+            )
+        else:
+            guide = Image.composite(Image.new("RGBA", image.size, "#ff4444"), image, mask.point(lambda v: round(v * .45)))
+            inputs += (ImageEditInput(encode(guide), "image/png", "选区指引.png"),)
+            guidance = "第一张是原图，第二张是选区指引，红色仅标记允许修改的区域，不是输出内容。保持完整画幅、商品结构、选区外文字与构图不变，不改变画面比例。只执行以下修改：\n"
+        prompt = guidance + "\n".join(instructions)
+        prompts.append(prompt)
         request = ImageEditRequest(prompt=prompt, image_bytes=source_png, image_mime_type="image/png", image_filename="原图.png", aspect_ratio=ratio, resolution=resolution,
-            image_inputs=(ImageEditInput(source_png, "image/png", "原图.png"), ImageEditInput(encode(guide), "image/png", "选区指引.png")), model_connection=connection)
+            image_inputs=inputs, model_connection=connection)
         result = await editor.edit(request)
         candidate = load_image(result.image_bytes).resize(image.size, Image.Resampling.LANCZOS)
-        image = Image.composite(candidate, image, mask)
+        image = candidate if is_text else Image.composite(candidate, image, mask)
+    prompt = "\n\n".join(prompts) if prompts else "本地裁剪与尺寸调整"
     for operation in operations:
         if operation["type"] != "crop_resize": continue
         payload, width, height = operation["payload"], image.width, image.height

@@ -101,7 +101,7 @@ async def compile_batch(project_id: UUID, payload: BatchHeroPromptCompileInput, 
             reverse_version_id=payload.reverseVersionId,
             modules=[BatchHeroModuleInput(item.moduleId, item.resultCount, [
                 parameter.model_dump() for parameter in item.moduleParameters
-            ], task_id=item.taskId, reverse_reference=(
+            ], task_id=item.taskId, task_design=item.taskDesign.model_dump(exclude_none=True) if item.taskDesign else None, reverse_reference=(
                 item.reverseReference.model_dump(mode="python")
                 if item.reverseReference else None
             )) for item in payload.modules],

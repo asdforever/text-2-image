@@ -28,6 +28,7 @@ class SuitePlanModuleInput:
     module_parameters: list[dict[str, str]] = field(default_factory=list)
     task_id: str | None = None
     reverse_reference: dict[str, Any] | None = None
+    task_design: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -260,6 +261,7 @@ class SuitePlanningService:
                 prompt_repository=self.prompt_repository,
             )
             system_prompt, user_prompt, prompt_snapshot = build_v2_compiler_prompts(
+                task_design=selected.task_design,
                 seed=seed, module=module, module_parameters=parameters,
                 module_prompt=module_prompt,
                 custom_style=custom_style,
@@ -307,7 +309,7 @@ class SuitePlanningService:
                     selected.task_id or selected.module_id,
                     selected.position if hasattr(selected, "position") else len(module_inputs) + 1,
                     selected.result_count,
-                    module.get("label", selected.module_id),
+                    (prompt_snapshot["effectiveTaskOutline"] or {}).get("taskTitle") or module.get("label", selected.module_id),
                     parameters,
                     module_snapshot,
                 )

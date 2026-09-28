@@ -11,6 +11,7 @@ from ..core.errors import AppError
 from .design_knowledge import design_knowledge_context, load_design_knowledge
 from .image_style_library import style_library_context
 from .commerce_design import commerce_design_context
+from .task_design import resolve_task_design
 
 
 PLANNER_VERSION_V2 = "v2"
@@ -51,7 +52,12 @@ SYSTEM_PROMPT_BASE = (
     "读取 commerceDesign 中实际提供的规则，先明确本图信息问题、事实证据和视觉解释。"
     "商品事实和适用平台规则优先，其次用户明确要求，再是本图信息目标和出场方式，最后才是"
     "可调整的 compositionAdvice、模块名称和模板建议。explicitCompositionRequirements 是用户构图要求，"
-    "不是上图文案或商品事实。compositionAdvice 可以优化，不能因模块名把 none 自动改回完整产品。"
+    "不是上图文案或商品事实。"
+    "explicitTaskDesign 是用户对本张图的最新设计选择，优先于自动任务书及旧构图建议；"
+    "taskOutline 已合并这些选择。用户填写的标题、信息目标和表达方式不是商品事实，也不是必须上图的文案。"
+    "productPresence=auto 表示用户把出场方式交给你按目标判断；显式留空的设计字段表示解除原有要求。"
+    "当出场方式改变时，同步调整旧建议中的商品构图，不得用旧建议撤销用户选择。"
+    "compositionAdvice 可以优化，不能因模块名把 none 自动改回完整产品。"
     "若用户明确要求改变出场方式，在 visualDirection 说明调整原因，并核对商品事实及平台约束。"
     "placement=primary 是首图、gallery 是附图、detail 是详情图；按规则适用范围执行，"
     "仅限首图的要求不得扩散到附图和详情图；适用于所有图片的规则始终遵守。"
@@ -361,6 +367,7 @@ def build_v2_compiler_prompts(
     module_prompt: str | None = None,
     shared_visual_direction: str = "",
     placement: str = "detail",
+    task_design: dict[str, Any] | None = None,
 ) -> tuple[str, str, dict[str, Any]]:
     # 模块绑定的规划提示词（商城模板）在前，通用规范在后；未绑定时只用通用规范
     template_id = (task_outline or {}).get("styleTemplateId", "")
@@ -375,6 +382,7 @@ def build_v2_compiler_prompts(
     if task_outline and not guides:
         raise AppError("MODULE_PLAN_NOT_READY", "请重新规划后生成图片", 409)
     commerce = commerce_design_context(guides)
+    effective_outline, explicit_design = resolve_task_design(task_outline, task_design)
     explicit_composition = [p["value"] for p in module_parameters if p["key"] == "构图要求"]
     content_parameters = [p for p in module_parameters if p["key"] != "构图要求"]
     if placement not in {"primary", "gallery", "detail"}:
@@ -400,7 +408,8 @@ def build_v2_compiler_prompts(
         "placement": placement,
         "compositionAdvice": (task_outline or {}).get("compositionBrief", ""),
         "explicitCompositionRequirements": explicit_composition,
-        "taskOutline": task_outline,
+        "taskOutline": effective_outline,
+        "explicitTaskDesign": explicit_design,
         "market": market,
         "output": output,
         "constraints": constraints,
@@ -412,6 +421,8 @@ def build_v2_compiler_prompts(
     user_prompt = json.dumps(context, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return system_prompt, user_prompt, {
         "requestVersion": PLANNER_VERSION_V2,
+        "taskDesign": explicit_design,
+        "effectiveTaskOutline": effective_outline,
         "commerceDesign": commerce,
         "styleLibraryVersion": library["version"],
         "styleLibraryRevision": library["revision"],

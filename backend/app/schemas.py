@@ -3,6 +3,7 @@ from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from .application.task_design import TaskDesignInput
 
 
 class SuiteCreate(BaseModel):
@@ -59,6 +60,7 @@ class HeroGenerationConfirmInput(BaseModel):
 
 
 class BatchHeroModuleInput(BaseModel):
+    taskDesign: TaskDesignInput | None = None
     model_config = ConfigDict(extra="forbid")
 
     moduleId: str = Field(min_length=1, max_length=100)
@@ -105,6 +107,7 @@ class ReverseModuleReferenceInput(BaseModel):
 
 
 class SuitePlanModuleCompileInput(BaseModel):
+    taskDesign: TaskDesignInput | None = None
     model_config = ConfigDict(extra="forbid")
 
     moduleId: str = Field(min_length=1, max_length=100)

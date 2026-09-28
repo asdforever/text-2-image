@@ -38,6 +38,7 @@ class BatchHeroModuleInput:
     module_parameters: list[dict[str, str]] = field(default_factory=list)
     task_id: str | None = None
     reverse_reference: dict[str, Any] | None = None
+    task_design: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -265,6 +266,7 @@ class BatchHeroPromptCompilationService:
                 prompt_repository=self.prompt_repository,
             )
             system_prompt, user_prompt, compiler_snapshot = build_v2_compiler_prompts(
+                task_design=selected.task_design,
                 seed=style_seed, module=module, module_parameters=parameters,
                 module_prompt=module_prompt,
                 custom_style=custom_style, task_outline=task_outline, market=market,
@@ -289,6 +291,9 @@ class BatchHeroPromptCompilationService:
                 "plannerVersion": PLANNER_VERSION_V2,
                 "taskId": task_id,
                 "moduleId": selected.module_id,
+                "taskDesign": compiler_snapshot["taskDesign"],
+                "effectiveTaskOutline": compiler_snapshot["effectiveTaskOutline"],
+                "title": (compiler_snapshot["effectiveTaskOutline"] or {}).get("taskTitle") or module.get("label", selected.module_id),
                 "styleSeed": style_seed.to_snapshot(),
                 **({"taskOutline": task_outline} if task_outline else {}),
                 **({"promptModelConnection": prompt_connection} if prompt_connection else {}),

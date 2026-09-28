@@ -184,3 +184,22 @@ async def test_modern_crop_creates_asset_without_model_configuration_or_generati
     output = await projects.get_object(generated[0].object_id, workspace_id)
     assert (output.width, output.height) == (4, 8)
     assert archive.calls[0]["product_type"] == "edit"
+
+
+@pytest.mark.asyncio
+async def test_canvas_text_without_generation_params_uses_source_portrait_ratio():
+    identity = LocalSingleUserIdentityProvider(IdentityContext(UUID(int=1), UUID(int=67), "owner"))
+    projects = InMemoryProjectRepository()
+    project = await projects.create_project("竖版素材加字", UUID(int=67))
+    storage = MemoryProjectAssetStorage()
+    assets = ProjectAssetService(projects, storage, identity)
+    data = BytesIO(); Image.new("RGB", (60, 80), "white").save(data, format="PNG")
+    source = await assets.upload_asset(project.id, "source", data.getvalue(), "image/png", "原图.png")
+    service = ImageEditingService(None, projects, identity)
+    session = await service.create_session(project.id, source.id)
+    await service.add_operation(session.id, {"operationId": "text", "type": "add_text", "payload": {"schemaVersion": 2, "text": "好吃不贵", "region": {"x": .1, "y": .1, "width": .5, "height": .1}}}, expected_revision=1)
+    task = await service.submit_session(session.id, prompt_snapshot={"summary": "加字"}, config_snapshot={"outputKind": "canvas_edit", "generationParams": {}})
+    editor = FakeEditor()
+    await ImageEditingWorker(service.repository, projects, storage, service, editor, assets).process_task(task.id)
+    assert task.status == "succeeded"
+    assert editor.requests[0].aspect_ratio == "3:4"

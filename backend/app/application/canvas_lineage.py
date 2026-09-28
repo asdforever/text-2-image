@@ -1,6 +1,24 @@
 """从生成时快照投影画布脉络，不读取当前提示词目录。"""
 
 from typing import Any
+from copy import deepcopy
+
+
+def _design_brief(snapshot, prompt, batch_snapshot, parameters):
+    outline = prompt.get("effectiveTaskOutline")
+    if outline is None:
+        outline = prompt.get("taskOutline")
+    if outline is None:
+        task_id = snapshot.get("taskId") or prompt.get("taskId") or snapshot.get("moduleKey")
+        modules = (batch_snapshot.get("planningMaster") or {}).get("modules", [])
+        outline = next((item for item in modules if task_id and item.get("taskId") == task_id), {})
+    design = {key: value for key, value in (outline or {}).items() if key in {
+        "taskTitle", "informationQuestion", "visualMechanism", "productPresence", "compositionBrief",
+    }}
+    requirements = [item["value"] for item in parameters if item.get("key") == "构图要求" and item.get("value", "").strip()]
+    if requirements:
+        design["compositionRequirements"] = requirements
+    return deepcopy(design)
 
 
 def style_harmonization_steps(jobs, assets) -> list[dict[str, Any]]:
@@ -37,9 +55,13 @@ async def canvas_generation_steps(project_id, workspace_id, assets, batches, edi
         batch, module = execution.batch, execution.module_task
         if batch.workspace_id != workspace_id or batch.project_id != project_id:
             continue
-        selection = dict(module.snapshot.get("selection", batch.snapshot.get("selection", {})))
+        prompt = module.snapshot.get("promptSnapshot", module.snapshot)
+        selection = {**batch.snapshot.get("selection", {}), **prompt.get("selection", {})}
         if "moduleParameters" in module.snapshot:
             selection["moduleParameters"] = module.snapshot["moduleParameters"]
+        design = _design_brief(module.snapshot, prompt, batch.snapshot, selection.get("moduleParameters", []))
+        if design:
+            selection["designBrief"] = design
         sources = batch.snapshot.get("sourceAssets") if batch.kind == "suite" else [batch.snapshot.get("sourceAsset", {"assetId": str(batch.source_asset_id)})]
         key = f"batch-module:{module.id}"
         if key not in steps:
@@ -48,11 +70,11 @@ async def canvas_generation_steps(project_id, workspace_id, assets, batches, edi
                 "batchStatus": batch.status,
                 "batchId": str(batch.id),
                 "batchCreatedAt": batch.created_at.isoformat(),
-                "title": module.snapshot.get("title") or selection.get("module", {}).get("label") or selection.get("module", {}).get("name") or "图片生成",
+                "title": design.get("taskTitle") or module.snapshot.get("title") or selection.get("module", {}).get("label") or selection.get("module", {}).get("name") or "图片生成",
                 "sourceAssetIds": [str(item["assetId"]) for item in (sources or []) if isinstance(item, dict) and item.get("assetId")],
                 "outputAssetIds": [], "outputVersionIds": [],
                 "finalPrompt": module.final_prompt or "", "taskPrompt": module.confirmed_task_prompt or "",
-                "constraints": module.snapshot.get("constraints", batch.snapshot.get("constraints", {})),
+                "constraints": prompt.get("constraints", batch.snapshot.get("constraints", {})),
                 "parameters": selection,
             }
         steps[key]["outputAssetIds"].append(str(asset.id))

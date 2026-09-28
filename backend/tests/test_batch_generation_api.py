@@ -63,7 +63,7 @@ async def test_batch_api_compiles_confirms_reads_cancels_and_retries_slots() -> 
                 "sourceAssetId": str(UUID(int=33)), "marketId": "taobao", "modelId": "gpt-image-2-5",
                 "styleId": "precision", "aspectRatio": "1:1", "resolution": "标准 1K",
                 "outputLanguage": "中文", "modules": [
-                    {"moduleId": "hero-kv", "resultCount": 3, "moduleParameters": []},
+                    {"moduleId": "hero-kv", "resultCount": 3, "moduleParameters": [], "taskDesign": {"productPresence": "none"}},
                     {"moduleId": "hero-scene", "resultCount": 2, "moduleParameters": []},
                 ],
             },
@@ -86,6 +86,7 @@ async def test_batch_api_compiles_confirms_reads_cancels_and_retries_slots() -> 
     assert cancelled.json()["data"]["status"] == "cancelled"
     assert retried.json()["data"]["slot"]["status"] == "queued"
     assert compile_service.compile[2] == "compile"
+    assert compile_service.compile[1].modules[0].task_design == {"productPresence": "none"}
     assert confirm_service.confirm[2] == {"hero-kv": "KV", "hero-scene": "场景"}
 
 

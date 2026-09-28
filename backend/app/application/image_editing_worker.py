@@ -63,6 +63,13 @@ class ImageEditingWorker:
         try:
             final_prompt = request.prompt
             if any(item.get("payload", {}).get("schemaVersion") == 2 for item in task.operations_snapshot):
+                if not (parameters.get("ratio") or parameters.get("aspectRatio")):
+                    source_width, source_height = load_image(source_stored.data).size
+                    supported = {"1:1": 1, "3:4": .75, "4:3": 4/3, "16:9": 16/9}
+                    allowed = (request.model_connection or {}).get("aspectRatios")
+                    choices = [value for value in supported if not allowed or value in allowed]
+                    if choices:
+                        ratio = min(choices, key=lambda value: abs(supported[value] - source_width/source_height))
                 data, final_prompt = await execute_operations(source_stored.data, task.operations_snapshot, self.image_editor,
                     ratio=ratio, resolution=resolution, connection=request.model_connection)
                 result = ImageEditResult(data, "image/png", {})

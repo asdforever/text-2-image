@@ -1,7 +1,7 @@
 from io import BytesIO
 
 import pytest
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from backend.app.application.image_editing_rendering import execute_operations, validate_operations
 from backend.app.application.hero_generation_ports import ImageEditResult
@@ -48,11 +48,29 @@ async def test_redraw_uses_real_prompt_and_guide_and_protects_unselected_pixels(
 
 
 @pytest.mark.asyncio
+async def test_add_text_automatically_designs_typography_within_user_region():
+    editor = Editor()
+    operation = op("add_text", text="新品上市", prompt="暖色手写标题，与背景协调", region={"x": .2, "y": .2, "width": .5, "height": .2, "rotation": 0})
+    result, prompt = await execute_operations(png("red"), [operation], editor, ratio="1:1", resolution="标准 1K", connection=None)
+    assert "新品上市" in prompt and "暖色手写标题，与背景协调" in prompt
+    assert "自动选择字体、字号、颜色和排版" in prompt
+    assert "用户明确描述的文字效果优先" in prompt
+    assert "textStyle" not in prompt and "fontSize" not in prompt
+    assert len(editor.requests) == 1
+    image = Image.open(BytesIO(result)).convert("RGB")
+    assert image.size == (100, 80)
+    assert len(editor.requests[0].ordered_image_inputs()) == 1
+    assert Image.open(BytesIO(editor.requests[0].image_bytes)).convert("RGB").getpixel((0, 0)) == (255, 0, 0)
+    assert image.getpixel((30, 20)) == (0, 0, 255)
+
+
+@pytest.mark.asyncio
 async def test_text_replacement_passes_exact_strings_region_and_style():
     editor = Editor()
     result, prompt = await execute_operations(png("red"), [op("change_text", originalText="旧标题", newText="新品上市", prompt="保持排版", region={"x": .2, "y": .2, "width": .5, "height": .2, "rotation": 0})], editor, ratio="1:1", resolution="标准 1K", connection=None)
     assert "旧标题" in prompt and "新品上市" in prompt and "保持排版" in prompt
-    assert Image.open(BytesIO(result)).convert("RGB").getpixel((0, 0)) == (255, 0, 0)
+    assert Image.open(BytesIO(result)).size == (100, 80)
+    assert len(editor.requests[0].ordered_image_inputs()) == 1
 
 
 @pytest.mark.parametrize("operation", [
@@ -62,3 +80,57 @@ async def test_text_replacement_passes_exact_strings_region_and_style():
 ])
 def test_invalid_edits_are_rejected_before_provider_call(operation):
     with pytest.raises(AppError): validate_operations([operation])
+
+
+@pytest.mark.asyncio
+async def test_text_edit_does_not_cut_complete_provider_letter_at_region_edge():
+    # A complete glyph returned across the layout guide must not become half a glyph.
+    source = Image.new("RGB", (100, 80), "white")
+    candidate = source.copy()
+    ImageDraw.Draw(candidate).rectangle((20, 10, 45, 35), outline="black", width=3)
+    data = BytesIO()
+    candidate.save(data, format="PNG")
+
+    class LetterEditor:
+        async def edit(self, request):
+            return ImageEditResult(data.getvalue(), "image/png", {})
+
+    result, _ = await execute_operations(png("white"), [op("add_text", text="口", region={"x": .2, "y": .125, "width": .2, "height": .2})], LetterEditor(), ratio="1:1", resolution="标准 1K", connection=None)
+    image = Image.open(BytesIO(result)).convert("RGB")
+    assert image.getpixel((44, 34)) == (0, 0, 0), "The completed lower-right strokes were hard-clipped"
+    assert image.tobytes() == candidate.tobytes()
+
+
+@pytest.mark.asyncio
+async def test_text_and_brush_edits_keep_full_text_but_limit_brush_changes():
+    class MixedEditor:
+        def __init__(self): self.requests = []
+        async def edit(self, request):
+            self.requests.append(request)
+            image = Image.open(BytesIO(request.image_bytes)).convert("RGB")
+            if len(self.requests) == 1:
+                ImageDraw.Draw(image).rectangle((20, 10, 45, 35), outline="black", width=3)
+            else:
+                # Model drift outside a brush selection must still be discarded.
+                image.paste("blue", (0, 0, 100, 80))
+            data = BytesIO(); image.save(data, format="PNG")
+            return ImageEditResult(data.getvalue(), "image/png", {})
+
+    editor = MixedEditor()
+    operations = [op("add_text", text="口", region={"x": .2, "y": .125, "width": .2, "height": .2}), op("erase", strokes=[{"mode": "draw", "width": .1, "points": [{"x": .8, "y": .8}]}])]
+    result, _ = await execute_operations(png("white"), operations, editor, ratio="1:1", resolution="标准 1K", connection=None)
+    image = Image.open(BytesIO(result)).convert("RGB")
+    assert len(editor.requests) == 2
+    assert image.getpixel((44, 34)) == (0, 0, 0)
+    assert image.getpixel((0, 0)) == (255, 255, 255)
+    assert image.getpixel((80, 64)) == (0, 0, 255)
+
+
+@pytest.mark.asyncio
+async def test_invalid_later_brush_mask_fails_before_text_provider_call():
+    editor = Editor()
+    stroke = {"width": .2, "points": [{"x": .5, "y": .5}]}
+    operations = [op("add_text", text="标题", region={"x": .2, "y": .2, "width": .5, "height": .2}), op("erase", strokes=[{"mode": "draw", **stroke}, {"mode": "erase", **stroke}])]
+    with pytest.raises(AppError):
+        await execute_operations(png("white"), operations, editor, ratio="1:1", resolution="标准 1K", connection=None)
+    assert editor.requests == []

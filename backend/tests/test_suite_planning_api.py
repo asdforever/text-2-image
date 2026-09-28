@@ -61,7 +61,7 @@ async def test_suite_planning_api_compiles_reads_edits_reorders_and_confirms() -
         "sourceAssetIds": [str(UUID(int=33)), str(UUID(int=34))],
         "marketId": "taobao", "modelId": "gpt-image-2-5", "styleId": "minimal",
         "aspectRatio": "3:4", "resolution": "标准 1K", "outputLanguage": "中文",
-        "modules": [{"moduleId": "suite-hero", "resultCount": 2, "moduleParameters": []}],
+        "modules": [{"moduleId": "suite-hero", "resultCount": 2, "moduleParameters": [], "taskDesign": {"productPresence": "context"}}],
         "references": [{"referenceId": "ref-1", "version": "v1"}],
     }
     async with httpx.AsyncClient(
@@ -97,6 +97,7 @@ async def test_suite_planning_api_compiles_reads_edits_reorders_and_confirms() -
     assert read.json()["data"]["constraints"]["market"]["content"] == "平台约束"
     assert confirmed.json()["data"]["batchId"] == str(UUID(int=99))
     assert service.calls[0][3] == "compile-suite"
+    assert service.calls[0][2].modules[0].task_design == {"productPresence": "context"}
     update_call = next(call for call in service.calls if call[0] == "update")
     assert update_call[3].requested_image_count == 3
     assert confirmation.call[2]["idempotency_key"] == "confirm-suite"
