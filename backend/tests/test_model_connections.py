@@ -10,7 +10,7 @@ from backend.app.core.config import Settings
 from backend.app.core.identity import IdentityContext, LocalSingleUserIdentityProvider
 from backend.app.core.errors import AppError
 from backend.app.application.model_connection_service import ModelConnectionService
-from backend.app.model_connection_repository import MemoryModelConnectionRepository
+from backend.app.model_connection_repository import MemoryModelConnectionRepository, ModelConnectionRecord
 from backend.app.core.model_secrets import ModelSecretCodec
 
 
@@ -66,6 +66,22 @@ async def test_environment_is_frozen_and_new_connection_does_not_change_old_task
     assert resolved.api_key == "legacy-private" and resolved.model_name == "legacy-image"
     updated = await restarted.create({"baseUrl": "https://new.example", "modelName": "new-image", "protocol": "openai_images", "reuseConnectionId": "environment"})
     assert (await restarted.resolve({"connectionId": updated["id"]})).api_key == "changed-private"
+
+
+@pytest.mark.asyncio
+async def test_environment_connection_recovers_when_legacy_ciphertext_is_unavailable():
+    service, repo, settings, identity = fixture()
+    record = ModelConnectionRecord(
+        uuid4(), identity.get_context().workspace_id, "https://legacy.example", "legacy-image",
+        "openai_images", b"dpapi:unavailable-for-this-user",
+    )
+    await repo.insert(record)
+
+    resolved = await service.resolve({"connectionId": str(record.id)})
+
+    assert resolved.base_url == settings.image_generation_base_url
+    assert resolved.model_name == settings.image_generation_model
+    assert resolved.api_key == settings.image_generation_api_key
 
 
 @pytest.mark.asyncio

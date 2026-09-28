@@ -8,6 +8,7 @@ from typing import Any
 from uuid import UUID
 
 from ..core.errors import AppError
+from .generation_concurrency import AdaptiveConcurrency
 from .hero_generation_ports import ImageEditInput, ImageEditRequest
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,7 @@ class BatchGenerationWorker:
         self.worker_id = worker_id
         self.lease_seconds = lease_seconds
         self.concurrency = max(1, concurrency)
+        self._adaptive_concurrency = AdaptiveConcurrency(self.concurrency)
         self.project_output_archive = project_output_archive
         self.provider_timeout_seconds = provider_timeout_seconds
 
@@ -112,7 +114,7 @@ class BatchGenerationWorker:
                             raise
                         logger.warning("生图租约恢复暂不可用，保留正在执行的请求")
                     next_recovery = perf_counter() + max(0.1, min(5.0, self.lease_seconds / 3))
-                capacity = self.concurrency - len(active)
+                capacity = self._adaptive_concurrency.current - len(active)
                 if capacity > 0:
                     try:
                         slots = await self.repository.claim_queued_slots(
@@ -133,7 +135,17 @@ class BatchGenerationWorker:
                     return_when=asyncio.FIRST_COMPLETED,
                 )
                 active = pending
-                completed += sum(task.result() for task in done)
+                for task in done:
+                    result = task.result()
+                    previous = self._adaptive_concurrency.current
+                    self._adaptive_concurrency.record(result)
+                    if self._adaptive_concurrency.current != previous:
+                        logger.info(
+                            "生图并发调整为 %s（本轮结果=%s）",
+                            self._adaptive_concurrency.current,
+                            "success" if result else "failure",
+                        )
+                    completed += int(result)
         finally:
             # Shutdown never leaves untracked provider calls running in this process.
             for task in active:

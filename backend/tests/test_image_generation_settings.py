@@ -28,12 +28,12 @@ def test_settings_allow_prompt_compiler_to_be_unconfigured() -> None:
     assert settings.context_model is None
 
 
-def test_settings_default_to_a_single_safe_generation_worker() -> None:
+def test_settings_default_to_three_adaptive_generation_workers() -> None:
     settings = Settings(_env_file=None)
 
     assert settings.generation_worker_poll_interval_ms == 1_000
     assert settings.generation_worker_lease_seconds == 60
-    assert settings.generation_worker_concurrency == 1
+    assert settings.generation_worker_concurrency == 3
     assert settings.generation_worker_claim_limit == 4
 
 

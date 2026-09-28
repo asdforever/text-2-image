@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     model_connection_encryption_key: str | None = Field(default=None, repr=False)
     generation_worker_poll_interval_ms: int = Field(default=1_000, ge=100)
     generation_worker_lease_seconds: int = Field(default=60, ge=1)
-    generation_worker_concurrency: int = Field(default=1, ge=1)
+    generation_worker_concurrency: int = Field(default=3, ge=1)
     generation_worker_claim_limit: int = Field(default=4, ge=1)
     context_base_url: str | None = None
     context_api_key: str | None = Field(default=None, repr=False)

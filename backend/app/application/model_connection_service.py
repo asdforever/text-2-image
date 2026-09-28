@@ -165,9 +165,31 @@ class ModelConnectionService:
             **({"modelId":model["id"]} if model.get("id") else {})}
 
     async def resolve(self, snapshot):
+        connection_id = snapshot.get("connectionId") if isinstance(snapshot, dict) else None
+        # Environment-derived connections use a deterministic id. Resolve that
+        # id directly so a legacy DPAPI/Fernet payload can never block an old
+        # task after the backend user or encryption key changes.
+        try:
+            environment = self.environment()
+        except AppError:
+            environment = None
+        if environment is not None and connection_id == str(
+            uuid5(
+                self.workspace,
+                sha256(
+                    (environment.base_url + "\0" + environment.model_name + "\0" + environment.api_key).encode()
+                ).hexdigest(),
+            )
+        ):
+            return environment
         record = await self._record(snapshot.get("connectionId"))
         self._require_protocol(record, "openai_images")
-        return ResolvedModelConnection(record.base_url, record.model_name, record.protocol, self.codec.decrypt(record.encrypted_key))
+        return ResolvedModelConnection(
+            record.base_url,
+            record.model_name,
+            record.protocol,
+            self._decrypt_record_key(record, "openai_images"),
+        )
 
     @staticmethod
     def _require_protocol(connection, protocol):
@@ -193,4 +215,31 @@ class ModelConnectionService:
     async def resolve_prompt(self, snapshot):
         record = await self._record(snapshot.get("connectionId"))
         self._require_protocol(record, "openai_chat")
-        return ResolvedModelConnection(record.base_url, record.model_name, record.protocol, self.codec.decrypt(record.encrypted_key))
+        return ResolvedModelConnection(
+            record.base_url,
+            record.model_name,
+            record.protocol,
+            self._decrypt_record_key(record, "openai_chat"),
+        )
+
+    def _decrypt_record_key(self, record, protocol):
+        try:
+            return self.codec.decrypt(record.encrypted_key)
+        except AppError as exc:
+            if exc.code != "MODEL_SECRET_UNAVAILABLE":
+                raise
+            # Environment-derived connections are persisted so task snapshots
+            # can remain immutable. If their legacy DPAPI value cannot be opened
+            # after a user/profile change, the current environment credential is
+            # still the same connection and can be used safely.
+            try:
+                environment = self.environment() if protocol == "openai_images" else self.prompt_environment()
+            except AppError:
+                raise
+            if (
+                record.protocol != environment.protocol
+                or record.base_url != environment.base_url
+                or record.model_name != environment.model_name
+            ):
+                raise
+            return environment.api_key
