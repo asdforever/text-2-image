@@ -10,6 +10,8 @@ from backend.app.application.module_planning_v2 import (
 def test_master_output_preserves_set_and_task_visual_constraints() -> None:
     value = MasterOutput.model_validate(
         {
+            "planningContractVersion": "commerce-design-v1",
+            "sharedVisualDirection": "统一品牌色和清晰的信息层级。",
             "summary": "先建立识别，再解释差异。",
             "visualRhythm": ["full_bleed", "detail_callout"],
             "productPresencePlan": ["full", "detail"],
@@ -18,6 +20,8 @@ def test_master_output_preserves_set_and_task_visual_constraints() -> None:
                 {
                     "moduleId": "suite-detail",
                     "taskId": "detail-1",
+                    "taskTitle": "解释关键细节",
+                    "designGuideIds": ["visual-hierarchy", "data-explanation"],
                     "resultCount": 1,
                     "moduleParameters": [],
                     "compositionBrief": "只表现关键局部和标注关系。",
@@ -57,6 +61,7 @@ def test_compiler_prompt_contains_generic_design_knowledge() -> None:
         module_parameters=[],
         custom_style="",
         task_outline={
+            "designGuideIds": ["visual-hierarchy"],
             "productPresence": "detail",
             "layoutFamily": "detail_annotation",
             "informationQuestion": "用户要看清哪个细节？",

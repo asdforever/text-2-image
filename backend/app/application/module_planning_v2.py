@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, Validation
 from ..core.errors import AppError
 from .design_knowledge import design_knowledge_context, load_design_knowledge
 from .image_style_library import style_library_context
+from .commerce_design import commerce_design_context
 
 
 PLANNER_VERSION_V2 = "v2"
@@ -40,10 +41,22 @@ SYSTEM_PROMPT_BASE = (
     "允许服务本图表达且不违背平台规则的辅助物和概念图形。\n\n"
 
     "【风格】\n"
-    "固定风格种子是跨模块一致性的边界：只允许在其内部做模块化细化，"
-    "不得改变固定种子的配色关系与光线逻辑。"
+    "保留所选风格的配色方向、品牌气质及用户明确要求，以 sharedVisualDirection 统一系列。"
+    "风格种子中的默认光照、环境、机位是执行建议，可按本图任务调整；信息图不必棚拍，"
+    "使用场景不必复制首图背景。用户明确指定的光照或构图必须遵守。"
     "风格种子或模板中的纸纹、金属等材质描述只作用于背景、辅助物与版式，"
     "不能改写商品本体的材质、颜色、纹理和结构。\n\n"
+
+    "【设计指导与任务优先级】\n"
+    "读取 commerceDesign 中实际提供的规则，先明确本图信息问题、事实证据和视觉解释。"
+    "商品事实和适用平台规则优先，其次用户明确要求，再是本图信息目标和出场方式，最后才是"
+    "可调整的 compositionAdvice、模块名称和模板建议。explicitCompositionRequirements 是用户构图要求，"
+    "不是上图文案或商品事实。compositionAdvice 可以优化，不能因模块名把 none 自动改回完整产品。"
+    "若用户明确要求改变出场方式，在 visualDirection 说明调整原因，并核对商品事实及平台约束。"
+    "placement=primary 是首图、gallery 是附图、detail 是详情图；按规则适用范围执行，"
+    "仅限首图的要求不得扩散到附图和详情图；适用于所有图片的规则始终遵守。"
+    "出图前在本次响应内自检：主信息是否一眼可见、图形是否解释事实、商品是否需要出场、"
+    "与相邻图片是否有合理变化。不要输出额外评审字段。\n\n"
 
     "【通用创意模板】\n"
     "styleLibrary 是版本化的通用模板目录。优先使用 taskOutline.styleTemplateId 选择的模板，"
@@ -252,7 +265,7 @@ def resolve_style_seed(style: dict[str, Any]) -> StyleSeed:
         raise AppError("STYLE_SEED_INVALID", "所选风格缺少稳定标识", 500)
     builtin = _BUILTIN_STYLE_SEEDS.get(style_id)
     if builtin is not None:
-        return _seed(f"builtin:{style_id}", style_id, "style-seed-v1", builtin)
+        return _seed(f"builtin:{style_id}", style_id, "style-seed-v2", builtin)
     description = str(style.get("description", "")).strip()
     if not description or len(description) > 1000:
         raise AppError(
@@ -346,7 +359,9 @@ def build_v2_compiler_prompts(
     constraints: dict[str, str],
     additional_context: dict[str, Any] | None = None,
     module_prompt: str | None = None,
-) -> tuple[str, str, dict[str, str]]:
+    shared_visual_direction: str = "",
+    placement: str = "detail",
+) -> tuple[str, str, dict[str, Any]]:
     # 模块绑定的规划提示词（商城模板）在前，通用规范在后；未绑定时只用通用规范
     template_id = (task_outline or {}).get("styleTemplateId", "")
     try:
@@ -354,7 +369,16 @@ def build_v2_compiler_prompts(
     except KeyError:
         raise AppError("MODULE_PLANNER_INVALID_RESPONSE", "规划引用的视觉模板不存在，请重新规划", 502) from None
     bound = (module_prompt or "").strip()
-    system_prompt = f"{bound}\n\n{SYSTEM_PROMPT_BASE}" if bound else SYSTEM_PROMPT_BASE
+    system_prompt = (f"【模块表达建议，可在任务目标内调整】\n{bound}\n\n{SYSTEM_PROMPT_BASE}"
+                     if bound else SYSTEM_PROMPT_BASE)
+    guides = task_outline.get("designGuideIds") if task_outline else ["visual-hierarchy"]
+    if task_outline and not guides:
+        raise AppError("MODULE_PLAN_NOT_READY", "请重新规划后生成图片", 409)
+    commerce = commerce_design_context(guides)
+    explicit_composition = [p["value"] for p in module_parameters if p["key"] == "构图要求"]
+    content_parameters = [p for p in module_parameters if p["key"] != "构图要求"]
+    if placement not in {"primary", "gallery", "detail"}:
+        raise AppError("MODULE_PLANNER_INVALID_INPUT", "图片展示位置无效", 400)
     reverse_guidance = (additional_context or {}).get("additionalContext", {})
     if reverse_guidance.get("reversePlanning") or reverse_guidance.get("reverseReference"):
         system_prompt += (
@@ -370,7 +394,12 @@ def build_v2_compiler_prompts(
         "styleSeed": seed.to_snapshot(),
         "customStyle": normalize_custom_style(custom_style),
         "module": module,
-        "moduleParameters": module_parameters,
+        "moduleParameters": content_parameters,
+        "commerceDesign": commerce,
+        "sharedVisualDirection": shared_visual_direction,
+        "placement": placement,
+        "compositionAdvice": (task_outline or {}).get("compositionBrief", ""),
+        "explicitCompositionRequirements": explicit_composition,
         "taskOutline": task_outline,
         "market": market,
         "output": output,
@@ -383,6 +412,7 @@ def build_v2_compiler_prompts(
     user_prompt = json.dumps(context, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return system_prompt, user_prompt, {
         "requestVersion": PLANNER_VERSION_V2,
+        "commerceDesign": commerce,
         "styleLibraryVersion": library["version"],
         "styleLibraryRevision": library["revision"],
         "styleLibrarySha256": library["contentSha256"],

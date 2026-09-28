@@ -1,0 +1,17 @@
+{
+  "version": "commerce-design-v1",
+  "sources": [
+    {
+      "repository": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "revision": "09170eec67eefd46a7ae85de61b40c194020f997",
+      "paths": "cli/assets/skills/banner-design/SKILL.md",
+      "license": "MIT"
+    },
+    {
+      "repository": "pbakaus/impeccable",
+      "revision": "9d715cc4f5564a990ca8345abfdd5df6dc9b41c8",
+      "paths": "plugin/skills/impeccable/SKILL.md; plugin/skills/impeccable/reference/new-work.md; plugin/skills/impeccable/reference/bolder.md",
+      "license": "Apache-2.0"
+    }
+  ]
+}

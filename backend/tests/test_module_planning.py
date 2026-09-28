@@ -15,13 +15,19 @@ from backend.tests.test_suite_planning_service import _fixture, SuitePlanCompila
 
 
 def output(mode="suite"):
-    return {"summary": "先认识商品，再了解细节", "modules": [
+    return {"planningContractVersion": "commerce-design-v1",
+        "sharedVisualDirection": "统一冷灰品牌色与清晰的信息层级",
+        "summary": "先认识商品，再了解细节", "modules": [
         {"moduleId": f"{mode}-hero" if mode == "suite" else "hero-kv", "resultCount": 1,
+         "taskTitle": "认识商品", "designGuideIds": ["visual-hierarchy"],
+         "productPresence": "full",
          "moduleParameters": [{"key": "首要信息", "value": "商品外观"}],
          "compositionBrief": "产品居中，下方留标题区域", "reason": "建立第一印象",
          "styleTemplateId": "product-commerce-visual", "bigIdea": "商品与用途呼应",
          "visualMechanism": "商品与使用场景形成关系"},
         {"moduleId": f"{mode}-detail", "resultCount": 1,
+         "taskTitle": "看清按键", "designGuideIds": ["visual-hierarchy", "data-explanation"],
+         "productPresence": "detail",
          "moduleParameters": [{"key": "细节主体", "value": "按键"}],
          "compositionBrief": "左右分栏展示按键特写和位置示意", "reason": "展示可见细节",
          "styleTemplateId": "infographic-engine", "bigIdea": "看清操作细节",
@@ -48,7 +54,8 @@ async def fixture(mode="suite"):
         f.service.identity_provider, f.master,
     )
     f.input = ModulePlanInput(mode=mode, sourceAssetIds=f.source_asset_ids,
-        marketId="taobao", aspectRatio="3:4", outputLanguage="中文", brief="展示外观和按键")
+        marketId="taobao", aspectRatio="3:4", outputLanguage="中文", brief="展示外观和按键",
+        styleId="minimal", customStyle="")
     return f
 
 
@@ -76,8 +83,9 @@ async def test_master_selects_modules_persists_output_and_replays_without_model(
     result = await f.master_service.plan(f.project_id, f.input, "master-1")
     assert result["status"] == "completed"
     assert len(result["modules"]) == 2
-    assert result["modules"][0]["moduleParameters"][-1] == {
-        "key": "建议构图简案", "value": "产品居中，下方留标题区域"}
+    assert result["modules"][0]["moduleParameters"] == [
+        {"key": "首要信息", "value": "商品外观"}
+    ]
     assert (await f.master_service.latest(f.project_id, mode))["id"] == result["id"]
     assert (await f.master_service.plan(f.project_id, f.input, "master-1"))["id"] == result["id"]
     assert len(f.master.calls) == 1
@@ -158,7 +166,7 @@ async def test_master_rejects_unknown_style_template_before_compile(selection):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("field", ["styleTemplateId", "bigIdea", "visualMechanism"])
 @pytest.mark.parametrize("value", [None, "", "   "])
-async def test_fresh_master_requires_template_and_concrete_idea(field, value):
+async def test_master_requires_template_and_concrete_idea(field, value):
     f = await fixture()
     if value is None:
         f.master.result["modules"][0].pop(field)
@@ -215,16 +223,18 @@ async def test_provider_outage_does_not_trigger_format_correction():
 
 
 @pytest.mark.asyncio
-async def test_historical_master_snapshot_without_style_choice_still_loads():
+async def test_obsolete_master_snapshot_requires_replanning():
     f = await fixture()
     old = output()
+    old.pop("planningContractVersion")
     for module in old["modules"]:
         for field in ("styleTemplateId", "bigIdea", "visualMechanism"):
             module.pop(field)
     record, _ = await f.master_repo.create(f.workspace_id, f.project_id, "historical", "old",
         dict(mode="suite", status="completed", **old))
-    snapshot = await f.master_service.snapshot(f.project_id, UUID(record["id"]), "suite")
-    assert snapshot["modules"] == old["modules"]
+    with pytest.raises(AppError) as caught:
+        await f.master_service.snapshot(f.project_id, UUID(record["id"]), "suite")
+    assert caught.value.code == "MODULE_PLAN_NOT_READY"
     assert f.master.calls == []
 
 
@@ -297,11 +307,11 @@ async def test_builtin_skill_is_selected_by_mode_and_legacy_binding_is_ignored(m
 
 @pytest.mark.asyncio
 async def test_missing_builtin_skill_fails_without_model_call(monkeypatch):
-    from pathlib import Path
+    from backend.app.application import module_planning_service
     f = await fixture()
     def missing(*args, **kwargs):
-        raise FileNotFoundError("skill missing")
-    monkeypatch.setattr(Path, "read_text", missing)
+        raise AppError("MODULE_PLANNER_SKILL_UNAVAILABLE", "skill missing", 503)
+    monkeypatch.setattr(module_planning_service, "load_planning_skill", missing)
     with pytest.raises(AppError) as error:
         await f.master_service.plan(f.project_id, f.input, "missing-skill")
     assert error.value.code == "MODULE_PLANNER_SKILL_UNAVAILABLE"
@@ -326,11 +336,12 @@ async def test_master_brief_flows_into_hero_modules_and_style_without_losing_man
     master = ModulePlanningService(MemoryModulePlanningRepository(), f.projects, f.storage,
         f.config, f.prompts, f.service.identity_provider, Planner(output("hero")))
     payload = ModulePlanInput(mode="hero", sourceAssetIds=[f.source_asset_id], marketId="taobao",
-        aspectRatio="1:1", outputLanguage="中文", brief="展示按键，暖灰色视觉风格")
+        aspectRatio="1:1", outputLanguage="中文", brief="展示按键，暖灰色视觉风格",
+        styleId="minimal", customStyle="暖灰色视觉风格")
     outline = await master.plan(f.project_id, payload, "hero-master")
     f.service.module_planning = master
     modules = [BatchHeroModuleInput(m["moduleId"], m["resultCount"], m["moduleParameters"]) for m in outline["modules"]]
-    modules[0].module_parameters[-1]["value"] = "手动微调：商品靠右"
+    modules[0].module_parameters.append({"key": "构图要求", "value": "手动微调：商品靠右"})
     request = replace(_input(f.source_asset_id), modules=modules, module_plan_id=UUID(outline["id"]))
     batch = await f.service.compile_prompt_batch(f.project_id, request, "hero-master-compile")
     detail = await f.repository.get_batch_detail(batch.id, f.workspace_id)

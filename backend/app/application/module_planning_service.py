@@ -16,6 +16,10 @@ from .image_style_library import (
 )
 from .idempotency import request_fingerprint
 from .planning_skills import load_planning_skill
+from .commerce_design import commerce_design_context
+from .runtime_module_catalog import runtime_module_catalog, runtime_catalog_snapshot
+from .hero_prompting import _find_style
+from .module_planning_v2 import resolve_style_seed
 
 
 logger = logging.getLogger(__name__)
@@ -31,6 +35,8 @@ class ModulePlanInput(BaseModel):
     outputLanguage: str = Field(min_length=1, max_length=40)
     brief: str = Field(default="", max_length=20000)
     reverseVersionId: UUID | None = None
+    styleId: str | None
+    customStyle: str = Field(max_length=2000)
 
 
 class Parameter(BaseModel):
@@ -43,27 +49,35 @@ class PlannedModule(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     moduleId: str = Field(min_length=1, max_length=100)
     taskId: str | None = Field(default=None, min_length=1, max_length=100)
+    taskTitle: str = Field(min_length=1, max_length=80)
+    designGuideIds: list[str] = Field(min_length=1, max_length=2)
     resultCount: StrictInt = Field(ge=1, le=1)
     moduleParameters: list[Parameter] = Field(default_factory=list, max_length=19)
     compositionBrief: str = Field(min_length=1, max_length=500)
     reason: str = Field(min_length=1, max_length=500)
     informationQuestion: str = Field(default="", max_length=300)
-    productPresence: str = Field(default="", max_length=40)
+    productPresence: Literal["full", "partial", "detail", "context", "none"]
     subjectScale: str = Field(default="", max_length=40)
     layoutFamily: str = Field(default="", max_length=100)
     evidence: list[str] = Field(default_factory=list, max_length=20)
     previousModuleContrast: str = Field(default="", max_length=300)
     avoid: list[str] = Field(default_factory=list, max_length=20)
-    styleTemplateId: str = Field(default="", max_length=100)
+    styleTemplateId: str = Field(min_length=1, max_length=100)
     visualStyleTags: list[str] = Field(default_factory=list, max_length=10)
     sceneTags: list[str] = Field(default_factory=list, max_length=10)
     referenceCaseIds: list[int] = Field(default_factory=list, max_length=10)
-    bigIdea: str = Field(default="", max_length=500)
-    visualMechanism: str = Field(default="", max_length=500)
+    bigIdea: str = Field(min_length=1, max_length=500)
+    visualMechanism: str = Field(min_length=1, max_length=500)
     referenceModuleId: str | None = Field(default=None, min_length=1, max_length=200)
 
     @model_validator(mode="after")
     def validate_style_selection(self):
+        try:
+            commerce_design_context(self.designGuideIds)
+        except AppError as exc:
+            if exc.code == "DESIGN_GUIDE_INVALID":
+                raise ValueError("invalid design guides") from None
+            raise
         if self.styleTemplateId:
             try:
                 template = resolve_style_template(self.styleTemplateId)
@@ -78,24 +92,14 @@ class PlannedModule(BaseModel):
 
 class MasterOutput(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    planningContractVersion: Literal["commerce-design-v1"]
+    sharedVisualDirection: str = Field(min_length=1, max_length=1000)
     summary: str = Field(min_length=1, max_length=2000)
     visualRhythm: list[str] = Field(default_factory=list, max_length=20)
     productPresencePlan: list[str] = Field(default_factory=list, max_length=20)
     layoutFamilies: list[str] = Field(default_factory=list, max_length=20)
     modules: list[PlannedModule] = Field(min_length=1)
     warnings: list[str] = Field(default_factory=list, max_length=50)
-
-
-class FreshPlannedModule(PlannedModule):
-    """New model responses must choose a template; historical plans remain readable."""
-
-    styleTemplateId: str = Field(min_length=1, max_length=100)
-    bigIdea: str = Field(min_length=1, max_length=500)
-    visualMechanism: str = Field(min_length=1, max_length=500)
-
-
-class FreshMasterOutput(MasterOutput):
-    modules: list[FreshPlannedModule] = Field(min_length=1)
 
 
 @dataclass(frozen=True)
@@ -133,6 +137,8 @@ class ModulePlanningService:
         value = await self.get(project, plan_id)
         if value["mode"] != mode or value["status"] != "completed":
             raise AppError("MODULE_PLAN_NOT_READY", "自动规划尚未完成或类型不匹配", 409)
+        if value.get("planningContractVersion") != "commerce-design-v1":
+            raise AppError("MODULE_PLAN_NOT_READY", "请重新规划后生成图片", 409)
         return value
 
     async def plan(self, project, payload, key):
@@ -147,8 +153,9 @@ class ModulePlanningService:
                 or set(payload.sourceAssetIds) & set(payload.referenceAssetIds)):
             raise AppError("MODULE_PLAN_INVALID_INPUT", "参考图不能重复或与产品图重叠，最多 12 张", 400)
         initial = dict(mode=payload.mode, status="planning", summary="", modules=[], warnings=[],
+                       planningContractVersion="commerce-design-v1",
                        input=payload.model_dump(mode="json"), error=None)
-        fingerprint_input = dict(initial["input"])
+        fingerprint_input = dict(initial["input"], planningContractVersion="commerce-design-v1")
         if not fingerprint_input["referenceAssetIds"]:
             fingerprint_input.pop("referenceAssetIds")
         if fingerprint_input.get("reverseVersionId") is None:
@@ -190,7 +197,14 @@ class ModulePlanningService:
             roles.append({"imageIndex": len(images), "assetId": str(asset_id), "role": role, "order": order})
         published = await self.config.get_published()
         config = published.content
-        catalog = config[f"{payload.mode}Modules"]
+        catalog = runtime_module_catalog(config, payload.mode)
+        knowledge = design_knowledge_context(load_design_knowledge())
+        commerce = commerce_design_context()
+        selected_style = None
+        if payload.styleId:
+            style = _find_style(config.get("styleCategories"), payload.styleId)
+            selected_style = {"id": style["id"], "description": style.get("description", ""),
+                              "seed": resolve_style_seed(style).to_snapshot(), "customStyle": payload.customStyle}
         market = _find_by_id(config["markets"], payload.marketId, "电商平台")
         market_card = await _resolve_bound_card(fallback=market["guidance"], fallback_source="market_guidance",
             binding=config.get("marketBindings", {}).get(payload.marketId), prompt_repository=self.prompts)
@@ -214,14 +228,16 @@ class ModulePlanningService:
                 "当前商品事实必须来自当前项目素材与约束，禁止把竞品参数、功效、价格或认证写成当前商品事实。"
             )
         context = {**payload.model_dump(mode="json"), "moduleCatalog": catalog, "imageRoles": roles,
-                   "styleLibrary": library, "outputSchema": FreshMasterOutput.model_json_schema(),
+                   "styleLibrary": library, "outputSchema": MasterOutput.model_json_schema(),
+                   "designKnowledge": knowledge, "commerceDesign": commerce, "selectedStyle": selected_style,
                    "constraints": {"market": market_card.content, "authenticity": PRODUCT_AUTHENTICITY_CONSTRAINT},
                    **({"reversePlanning": reverse_context} if reverse_context else {})}
         user = json.dumps(context, ensure_ascii=False)
         value["snapshot"] = dict(generationConfig={"version": published.version_no, "contentSha256": published.content_sha256},
                                  skill=skill.to_snapshot(), promptModelConnection=connection, sourceAssets=sources,
                                  referenceAssets=references, imageRoles=roles,
-                                 designKnowledge=design_knowledge_context(load_design_knowledge()),
+                                 designKnowledge=knowledge, commerceDesign=commerce, selectedStyle=selected_style,
+                                 runtimeModules=runtime_catalog_snapshot(config),
                                  styleLibrary=library,
                                  systemPrompt=system, userPrompt=user,
                                  **({"reversePlanning": reverse_context} if reverse_context else {}))
@@ -254,7 +270,7 @@ class ModulePlanningService:
 
     @staticmethod
     def _validate_output(raw, mode, catalog, reverse_module_ids: set[str] | None = None):
-        result = FreshMasterOutput.model_validate(raw).model_dump()
+        result = MasterOutput.model_validate(raw).model_dump()
         ids = [m["moduleId"] for m in result["modules"]]
         if mode == "hero" and len(ids) > 8:
             raise ValueError("too many hero modules")
@@ -273,6 +289,6 @@ class ModulePlanningService:
             keys = [p["key"] for p in params]
             if len(keys) != len(set(keys)):
                 raise ValueError("duplicate parameters")
-            module["moduleParameters"] = [p for p in params if p["key"] != "建议构图简案"] + [
-                {"key": "建议构图简案", "value": module["compositionBrief"]}]
+            if any(key in {"建议构图简案", "构图要求"} for key in keys):
+                raise ValueError("automatic composition belongs in compositionBrief")
         return result

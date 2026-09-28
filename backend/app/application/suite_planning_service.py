@@ -3,6 +3,7 @@ from typing import Any, Literal
 from uuid import UUID
 
 from ..core.errors import AppError
+from .runtime_module_catalog import runtime_module_catalog, runtime_catalog_snapshot
 from ..suite_planning_repository import (
     SuitePlanModuleCompilation,
     SuitePlanModuleInput as RepositoryModuleInput,
@@ -212,7 +213,7 @@ class SuitePlanningService:
             ]
         ] = []
         for selected in request.modules:
-            module = _find_item(config.get("suiteModules"), selected.module_id, "详情页模块")
+            module = _find_item(runtime_module_catalog(config, "suite"), selected.module_id, "详情页模块")
             if module.get("mode") != "suite":
                 raise AppError("SUITE_PLAN_INVALID_INPUT", "详情页模块选择无效", 400)
             parameters = _normalize_parameters(selected.module_parameters)
@@ -263,6 +264,8 @@ class SuitePlanningService:
                 module_prompt=module_prompt,
                 custom_style=custom_style,
                 task_outline=task_outline,
+                shared_visual_direction=(master_snapshot or {}).get("sharedVisualDirection", ""),
+                placement="detail",
                 market={"id": market.get("id"), "label": market.get("label")},
                 output={"aspectRatio": request.aspect_ratio, "resolution": request.resolution, "language": request.output_language},
                 constraints={"productAuthenticity": cards.authenticity.content, "market": cards.market.content},
@@ -336,6 +339,7 @@ class SuitePlanningService:
             for asset, source_object, _stored in source_records
         ]
         snapshot = {
+            "runtimeModules": runtime_catalog_snapshot(config),
             "plannerVersion": PLANNER_VERSION_V2,
             "designKnowledge": design_knowledge_context(load_design_knowledge()),
             "styleSeed": seed.to_snapshot(),

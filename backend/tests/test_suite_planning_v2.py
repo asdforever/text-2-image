@@ -151,11 +151,15 @@ async def test_suite_v2_concurrent_replay_does_not_duplicate_module_calls():
 async def test_suite_v2_preserves_master_outline_and_matches_reused_module_by_task_id():
     f = await fixture_v2()
     master = {
+        "planningContractVersion": "commerce-design-v1",
+        "sharedVisualDirection": "统一品牌层级并区分整体与细节",
         "input": {"brief": "先展示整体，再展示结构"},
         "summary": "两图互补",
         "modules": [
-            {"taskId": "overall", "moduleId": "suite-hero", "taskGoal": "整体识别"},
-            {"taskId": "detail", "moduleId": "suite-hero", "taskGoal": "结构说明"},
+            {"taskId": "overall", "taskTitle": "整体识别", "moduleId": "suite-hero",
+             "taskGoal": "整体识别", "designGuideIds": ["visual-hierarchy"], "productPresence": "full"},
+            {"taskId": "detail", "taskTitle": "结构说明", "moduleId": "suite-hero",
+             "taskGoal": "结构说明", "designGuideIds": ["data-explanation"], "productPresence": "detail"},
         ],
     }
     async def snapshot(*_args):

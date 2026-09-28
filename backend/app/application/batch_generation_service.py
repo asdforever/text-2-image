@@ -8,6 +8,7 @@ from ..batch_generation_repository import (
     GenerationModuleInput,
 )
 from ..core.errors import AppError
+from .runtime_module_catalog import runtime_module_catalog, runtime_catalog_snapshot
 from .hero_generation_ports import ImageEditInput, ImageEditRequest, PromptCompileRequest
 from .hero_generation_service import (
     _find_item,
@@ -205,8 +206,8 @@ class BatchHeroPromptCompilationService:
             }
             for item in request.modules
         ]
-        for selected in request.modules:
-            module = _find_item(config.get("heroModules"), selected.module_id, "主图模块")
+        for task_index, selected in enumerate(request.modules):
+            module = _find_item(runtime_module_catalog(config, "hero"), selected.module_id, "主图模块")
             if module.get("mode") != "hero":
                 raise AppError("GENERATION_CONFIG_SELECTION_INVALID", "主图模块选择无效", 400)
             parameters = _normalize_parameters(selected.module_parameters)
@@ -267,6 +268,8 @@ class BatchHeroPromptCompilationService:
                 seed=style_seed, module=module, module_parameters=parameters,
                 module_prompt=module_prompt,
                 custom_style=custom_style, task_outline=task_outline, market=market,
+                shared_visual_direction=(master_snapshot or {}).get("sharedVisualDirection", ""),
+                placement="primary" if task_index == 0 else "gallery",
                 output={"aspectRatio": request.aspect_ratio, "resolution": request.resolution, "language": request.output_language},
                 constraints={"productAuthenticity": cards.authenticity.content, "market": cards.market.content},
                 additional_context={
@@ -321,6 +324,7 @@ class BatchHeroPromptCompilationService:
             )
 
         snapshot = {
+            "runtimeModules": runtime_catalog_snapshot(config),
             "plannerVersion": PLANNER_VERSION_V2,
             "designKnowledge": design_knowledge_context(load_design_knowledge()),
             "styleSeed": style_seed.to_snapshot(),

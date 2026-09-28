@@ -97,11 +97,17 @@ async def test_v2_batch_uses_one_call_per_task_and_freezes_master_outline() -> N
                 "id": str(plan_id),
                 "mode": "hero",
                 "status": "completed",
+                "planningContractVersion": "commerce-design-v1",
+                "sharedVisualDirection": "统一品牌层级并区分两张任务",
                 "summary": "两张图分别负责首屏识别与卖点延展",
                 "input": {"brief": "避免两张图构图重复"},
                 "modules": [
-                    {"moduleId": "hero-kv", "taskId": "kv-a", "compositionBrief": "主体居中"},
-                    {"moduleId": "hero-kv", "taskId": "kv-b", "compositionBrief": "主体偏左"},
+                    {"moduleId": "hero-kv", "taskId": "kv-a", "taskTitle": "建立识别",
+                     "designGuideIds": ["visual-hierarchy"], "productPresence": "full",
+                     "compositionBrief": "主体居中"},
+                    {"moduleId": "hero-kv", "taskId": "kv-b", "taskTitle": "扩展信息",
+                     "designGuideIds": ["data-explanation"], "productPresence": "detail",
+                     "compositionBrief": "主体偏左"},
                 ],
             }
 
@@ -136,7 +142,8 @@ async def test_v2_batch_uses_one_call_per_task_and_freezes_master_outline() -> N
     assert '"taskId":"kv-b"' in fixture.compiler.requests[0].user_prompt
     assert '"outputSchema"' in fixture.compiler.requests[0].user_prompt
     assert '"type":"array"' in fixture.compiler.requests[0].user_prompt
-    assert "不得改变固定种子的配色关系与光线逻辑" in fixture.compiler.requests[0].system_prompt
+    assert "统一品牌层级并区分两张任务" in fixture.compiler.requests[0].user_prompt
+    assert "不得改变固定种子的配色关系与光线逻辑" not in fixture.compiler.requests[0].system_prompt
 
 
 @pytest.mark.asyncio

@@ -73,10 +73,10 @@ STYLE_LIBRARY_PLANNING_RULES = """
 styleTemplateId 必须来自 templates 的 id；参考案例仅可从所选模板 exampleCaseIds 中选，
 且只是出处索引，不代表已查看案例图片。bigIdea 用一句话说明画面表达，visualMechanism 写
 主体与图形、环境或文字的具体关系。规格图和白底图可以采用清晰直接的陈列或图解，不强迫加特效。
-这些字段只决定表达结构；配色、光线仍由模块规划器结合用户风格决定。
+这些字段决定表达结构；sharedVisualDirection 规定系列共性，单图规划器结合用户风格细化，默认光线和环境可按任务调整。
 主体/任务、构图、材质、文字、画幅、约束都应在最终单张提示词中有明确安排。
 辅助物和概念图形只能服务已确认卖点；视觉隐喻不是实测证据，不能生成未经证实的内部结构或实验图。
-模型输出遵守 outputSchema，它描述数据结构，不是要复制的结果。顶层只输出 summary、visualRhythm、
+模型输出遵守 outputSchema，它描述数据结构，不是要复制的结果。顶层只输出 planningContractVersion、sharedVisualDirection、summary、visualRhythm、
 productPresencePlan、layoutFamilies、modules、warnings，不输出 type、properties 或 schema 包装。
 商品真实性、平台规则和用户明确要求优先于模板中的例子。
 风格材质只作用于背景、辅助物和版式，不能把商品本体改成纸、金属或其他未经确认的材质。

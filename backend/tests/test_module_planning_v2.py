@@ -87,7 +87,7 @@ def test_style_seed_freezes_builtin_and_safe_config_description_fallback() -> No
     )
 
     assert builtin.seed_id == "builtin:precision"
-    assert builtin.version == "style-seed-v1"
+    assert builtin.version == "style-seed-v2"
     assert builtin.sha256 == sha256(builtin.text.encode("utf-8")).hexdigest()
     assert custom.seed_id == "config:custom-clean"
     assert custom.text == "清透背景与自然柔光"

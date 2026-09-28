@@ -12,6 +12,7 @@ from ..generation_config_catalog import (
 from ..generation_config_repository import ConfigDraftRecord, ConfigVersionRecord
 from .idempotency import IdempotencyClaim, request_fingerprint
 from .ports import Clock, IdempotencyStore
+from .runtime_module_catalog import runtime_catalog_snapshot
 
 
 class GenerationConfigService:
@@ -61,6 +62,7 @@ class GenerationConfigService:
             "configVersion": published.version_no,
             "contentSha256": published.content_sha256,
             "config": config,
+            "runtimeModules": runtime_catalog_snapshot(config),
             "promptBindings": prompt_bindings,
         }
 

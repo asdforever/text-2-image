@@ -34,6 +34,7 @@ from backend.app.suite_planning_repository import InMemorySuitePlanningRepositor
 class _CompilerRequest:
     module_id: str
     image_inputs: list[bytes]
+    system_prompt: str
     user_prompt: str
 
 
@@ -43,7 +44,12 @@ class RecordingSuitePlanner:
 
     async def compile(self, request):
         self.requests.append(
-            _CompilerRequest(request.module_id, list(request.image_inputs), request.user_prompt)
+            _CompilerRequest(
+                request.module_id,
+                list(request.image_inputs),
+                request.system_prompt,
+                request.user_prompt,
+            )
         )
         from backend.tests.test_module_planning_v2 import _result_payload
         result = _result_payload()

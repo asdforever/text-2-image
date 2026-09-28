@@ -5,6 +5,7 @@ from typing import Any
 from uuid import UUID
 
 from ..core.errors import AppError
+from .runtime_module_catalog import runtime_module_catalog, runtime_catalog_snapshot
 from .hero_generation_ports import ImageEditRequest, PromptCompileRequest
 from .hero_prompting import (
     ConstraintCard,
@@ -153,7 +154,7 @@ class HeroGenerationService:
         style = _find_style(config.get("styleCategories"), request.style_id)
         custom_style = normalize_custom_style(request.custom_style)
         style_seed = resolve_style_seed(style)
-        module = _find_item(config.get("heroModules"), request.module_id, "主图模块")
+        module = _find_item(runtime_module_catalog(config, "hero"), request.module_id, "主图模块")
         if module.get("mode") != "hero":
             raise AppError("GENERATION_CONFIG_SELECTION_INVALID", "主图模块选择无效", 400)
         parameters = _normalize_parameters(request.module_parameters)
@@ -174,6 +175,7 @@ class HeroGenerationService:
                 module_prompt=module_prompt,
                 module_parameters=parameters,
                 custom_style=custom_style,
+                placement="primary",
                 task_outline=None,
                 market=market,
                 output={
@@ -196,6 +198,7 @@ class HeroGenerationService:
         prompt_compiler = bound.compiler if bound else self.prompt_compiler
         prompt_connection = bound.snapshot if bound else None
         snapshot = {
+            "runtimeModules": runtime_catalog_snapshot(config),
             "plannerVersion": PLANNER_VERSION_V2,
             "designKnowledge": design_knowledge_context(load_design_knowledge()),
             "styleSeed": style_seed.to_snapshot(),

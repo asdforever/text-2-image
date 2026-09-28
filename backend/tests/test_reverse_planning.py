@@ -155,11 +155,16 @@ async def test_batch_uses_master_reference_only_for_matching_reverse_version() -
             return {
                 "id": str(plan_id),
                 "status": "completed",
+                "planningContractVersion": "commerce-design-v1",
+                "sharedVisualDirection": "统一品牌层级",
                 "input": {"reverseVersionId": str(version.id)},
                 "modules": [
                     {
                         "moduleId": "hero-kv",
                         "taskId": "hero-kv",
+                        "taskTitle": "建立商品识别",
+                        "designGuideIds": ["visual-hierarchy"],
+                        "productPresence": "full",
                         "referenceModuleId": "benefit-proof",
                     }
                 ],
