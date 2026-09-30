@@ -1,3 +1,4 @@
+from .regular_design import render_regular
 from copy import deepcopy
 from hashlib import sha256
 from typing import Any
@@ -72,10 +73,10 @@ class SuitePlanningConfirmationService:
         frozen_modules: list[dict[str, Any]] = []
         for module in detail.modules:
             task_prompt = normalized_prompts[module.module_key]
-            frozen_prompt = render_v2_from_snapshot(module.prompt_snapshot)
+            frozen_prompt = render_regular(module.prompt_snapshot) if module.prompt_snapshot.get("creationMode") == "regular" else render_v2_from_snapshot(module.prompt_snapshot)
             if task_prompt != frozen_prompt:
                 raise AppError("V2_PROMPT_READ_ONLY", "提示词不可直接修改，请调整模块参数后重新编译", 400)
-            final_prompt = compose_v2_from_snapshot(module.prompt_snapshot)
+            final_prompt = frozen_prompt if module.prompt_snapshot.get("creationMode") == "regular" else compose_v2_from_snapshot(module.prompt_snapshot)
             final_hash = sha256(final_prompt.encode("utf-8")).hexdigest()
             frozen_module = {
                 "id": str(module.id),

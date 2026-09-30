@@ -1,3 +1,4 @@
+from .style_seed_catalog import resolve_marketplace_style_seed
 from dataclasses import asdict, dataclass, field
 from hashlib import sha256
 import json
@@ -23,7 +24,6 @@ from .module_planning_v2 import (
     parse_v2_result,
     render_v2_module_prompt,
     render_v2_from_snapshot,
-    resolve_style_seed,
     compose_v2_from_snapshot,
 )
 
@@ -153,7 +153,7 @@ class HeroGenerationService:
             )
         style = _find_style(config.get("styleCategories"), request.style_id)
         custom_style = normalize_custom_style(request.custom_style)
-        style_seed = resolve_style_seed(style)
+        style_seed = (await resolve_marketplace_style_seed(style, self.prompt_repository))
         module = _find_item(runtime_module_catalog(config, "hero"), request.module_id, "主图模块")
         if module.get("mode") != "hero":
             raise AppError("GENERATION_CONFIG_SELECTION_INVALID", "主图模块选择无效", 400)

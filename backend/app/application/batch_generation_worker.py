@@ -329,7 +329,7 @@ class BatchGenerationWorker:
                     product_type=product_type,
                     source_version_id=created_asset.id,
                     preview_url=f"/api/projects/{execution.batch.project_id}/assets/{created_asset.id}/preview",
-                    source_snapshot={"assetId": str(created_asset.id), "batchId": str(execution.batch.id), "slotId": str(execution.slot.id)},
+                    source_snapshot={"assetId": str(created_asset.id), "batchId": str(execution.batch.id), "batchCreatedAt": execution.batch.created_at.isoformat() if getattr(execution.batch, "created_at", None) else None, "creationMode": execution.batch.snapshot.get("creationMode") if isinstance(execution.batch.snapshot, dict) else None, "slotId": str(execution.slot.id)},
                     prompt_snapshot={"finalPrompt": final_prompt},
                     config_snapshot=dict(selection),
                 )

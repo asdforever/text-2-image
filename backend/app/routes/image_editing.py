@@ -124,7 +124,7 @@ async def capabilities() -> Any:
     return success_response(
         {
             "provider": {"name": "configured-image-editor", "version": "2", "capabilitiesVersion": "canvas-v2"},
-            "capabilities": {"imageToImage": True, "currentVersionInput": False, "redraw": True, "erase": True, "outpaint": False, "addText": True, "changeText": True, "cropResize": True, "ocr": False},
+            "capabilities": {"promptEdit": True, "imageToImage": True, "currentVersionInput": False, "redraw": True, "erase": True, "outpaint": False, "addText": True, "changeText": True, "cropResize": True, "ocr": False},
         }
     )
 

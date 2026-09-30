@@ -76,9 +76,14 @@ async def test_project_upload_appears_in_automatic_product_archive() -> None:
         products = await client.get(
             f"/api/product-libraries/{archive_library['id']}/products"
         )
+        count = await client.get(
+            f"/api/product-libraries/{archive_library['id']}/products/count"
+        )
 
     assert uploaded.status_code == 201
     assert products.status_code == 200
+    assert count.status_code == 200
+    assert count.json()["data"] == {"count": 1}
     archived = products.json()["data"]
     assert len(archived) == 1
     assert archived[0]["projectId"] == project_id

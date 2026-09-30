@@ -203,11 +203,24 @@ def project_archive_backfill(page_size: int) -> None:
     asyncio.run(run())
 
 
+def import_style_seed_catalog() -> None:
+    from .app.application.style_seed_catalog import import_style_seeds
+
+    async def run() -> None:
+        app = create_app()
+        async with app.router.lifespan_context(app):
+            report = await import_style_seeds(app.state.prompt_service)
+            print(json.dumps(report, ensure_ascii=False))
+
+    asyncio.run(run())
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="picagent-backend")
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("migrate")
     subparsers.add_parser("schema-check")
+    subparsers.add_parser("import-style-seeds")
     baseline = subparsers.add_parser("baseline-stamp")
     baseline.add_argument("--confirm-baseline", action="store_true")
     reset = subparsers.add_parser("db-reset")
@@ -219,6 +232,8 @@ def main() -> None:
     args = parser.parse_args()
     if args.command == "migrate":
         migrate()
+    elif args.command == "import-style-seeds":
+        import_style_seed_catalog()
     elif args.command == "schema-check":
         schema_check()
     elif args.command == "baseline-stamp":

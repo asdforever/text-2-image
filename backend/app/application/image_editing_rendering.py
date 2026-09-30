@@ -10,7 +10,7 @@ from .hero_generation_ports import ImageEditInput, ImageEditRequest
 from ..core.errors import AppError
 
 MAX_PIXELS = 32_000_000
-KINDS = {"add_text", "change_text", "redraw", "erase", "crop_resize"}
+KINDS = {"add_text", "change_text", "redraw", "erase", "crop_resize", "prompt_edit"}
 
 
 def invalid(message):
@@ -50,6 +50,7 @@ def validate_operations(operations):
             number(style.get("fontSize"), 8, 1000)
             number(style.get("strokeWidth", 0), 0, 20)
         if len(str(payload.get("prompt", ""))) > 8000: invalid("编辑要求过长")
+        if kind == "prompt_edit" and (not isinstance(payload.get("prompt"), str) or not payload["prompt"].strip()): invalid("请填写修改要求")
         if kind in {"redraw", "erase"}:
             strokes = payload.get("strokes")
             if not isinstance(strokes, list) or not 1 <= len(strokes) <= 500: invalid("请先绘制要修改的选区")
@@ -115,12 +116,13 @@ async def execute_operations(source, operations, editor, *, ratio, resolution, c
     prompts = []
     # Text regions guide layout, while brush masks define an exact compositing boundary.
     # Keep consecutive edits together without clipping text to a brush/rectangle mask.
-    for is_text, group in groupby(edits, key=lambda item: item["type"] in {"add_text", "change_text"}):
+    for edit_mode, group in groupby(edits, key=lambda item: "prompt" if item["type"] == "prompt_edit" else "text" if item["type"] in {"add_text", "change_text"} else "masked"):
+        is_text = edit_mode == "text"
         mask = Image.new("L", image.size)
         instructions = []
-        labels = {"add_text": "添加指定文字", "change_text": "替换指定文字，保留原字体感觉、透视和光影", "redraw": "局部重绘", "erase": "移除选中内容并自然补全背景"}
+        labels = {"add_text": "添加指定文字", "change_text": "替换指定文字，保留原字体感觉、透视和光影", "redraw": "局部重绘", "erase": "移除选中内容并自然补全背景", "prompt_edit": "按用户要求修改当前图片"}
         for operation in group:
-            if not is_text:
+            if edit_mode == "masked":
                 mask = ImageChops.lighter(mask, operation_mask(image.size, operation))
             payload = {key: value for key, value in operation["payload"].items() if key not in {"schemaVersion", "strokes"}}
             instruction = labels[operation["type"]] + "：" + json.dumps(payload, ensure_ascii=False)
@@ -134,7 +136,13 @@ async def execute_operations(source, operations, editor, *, ratio, resolution, c
             instructions.append(instruction)
         source_png = encode(image)
         inputs = (ImageEditInput(source_png, "image/png", "原图.png"),)
-        if is_text:
+        if edit_mode == "prompt":
+            guidance = (
+                f"这是用户选中的待修改图片，尺寸为 {image.width} × {image.height} 像素。以这张图片为编辑基础，输出完整画幅并保持原图比例。"
+                "按照用户的修改要求调整画面，例如替换背景、桌面、场景或光线。"
+                "未明确要求修改的商品外形、包装、标识、文字和其他内容应尽量保留；不要把编辑要求画成图片上的文字，也不要添加选区或辅助标记。修改要求：\n"
+            )
+        elif is_text:
             guidance = (
                 f"这是待编辑原图，尺寸为 {image.width} × {image.height} 像素。输出完整画幅，保持原图比例。"
                 "region 为相对原图左上角的归一化位置，表示文字排版范围，所有笔画必须完整落在此范围内，不得越界。"
@@ -152,7 +160,7 @@ async def execute_operations(source, operations, editor, *, ratio, resolution, c
             image_inputs=inputs, model_connection=connection)
         result = await editor.edit(request)
         candidate = load_image(result.image_bytes).resize(image.size, Image.Resampling.LANCZOS)
-        image = candidate if is_text else Image.composite(candidate, image, mask)
+        image = candidate if edit_mode != "masked" else Image.composite(candidate, image, mask)
     prompt = "\n\n".join(prompts) if prompts else "本地裁剪与尺寸调整"
     for operation in operations:
         if operation["type"] != "crop_resize": continue

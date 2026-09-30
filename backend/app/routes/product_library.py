@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 from uuid import UUID
 from fastapi import APIRouter, Request, Header
@@ -16,11 +17,17 @@ async def product_view(x, request: Request):
     assets = []
     project_repository = request.app.state.project_repository
     workspace_id = request.app.state.identity_provider.get_context().workspace_id
-    for link in await svc(request).list_product_asset_links(x.id):
-        asset = await project_repository.get_asset(link.project_asset_id, workspace_id)
+    details = {
+        str(asset.id): (asset, stored)
+        for asset, stored in (
+            await project_repository.list_asset_details(x.project_id, workspace_id)
+            if x.project_id else []
+        )
+    }
+    for link in await svc(request).list_product_asset_links(x.id, validate=False):
+        asset, stored = details.get(str(link.project_asset_id), (None, None))
         if asset is None or asset.state != "available":
             continue
-        stored = await project_repository.get_object(asset.object_id, workspace_id)
         if stored is None or stored.state != "available":
             continue
         matching_versions = [
@@ -63,7 +70,12 @@ async def archive_library(library_id: UUID, request: Request): return success_re
 @router.post("/api/product-libraries/{library_id}/products", status_code=201)
 async def create_product(library_id: UUID, payload: dict[str, Any], request: Request): return success_response(await product_view(await svc(request).create_product(library_id, str(payload.get("name", "")), UUID(str(payload["projectId"])) if payload.get("projectId") else None), request))
 @router.get("/api/product-libraries/{library_id}/products")
-async def list_products(library_id: UUID, request: Request, includeArchived: bool = False): return success_response([await product_view(x, request) for x in await svc(request).list_products(library_id, includeArchived)])
+async def list_products(library_id: UUID, request: Request, includeArchived: bool = False):
+    products = await svc(request).list_products(library_id, includeArchived)
+    return success_response(await asyncio.gather(*(product_view(product, request) for product in products)))
+@router.get("/api/product-libraries/{library_id}/products/count")
+async def count_products(library_id: UUID, request: Request, includeArchived: bool = False):
+    return success_response({"count": await svc(request).count_products(library_id, includeArchived)})
 @router.get("/api/products/{product_id}")
 async def get_product(product_id: UUID, request: Request): return success_response(await product_view(await svc(request).get_product(product_id), request))
 @router.get("/api/products/{product_id}/versions")

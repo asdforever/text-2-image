@@ -125,6 +125,8 @@ async def test_regeneration_freezes_upstream_and_constraints_and_persists_versio
     new_id = track["currentAssetIds"][0]
     assert new_id != str(old.id)
     assert archive.items[0]["product_type"] == "hero"
+    assert archive.items[0]["source_snapshot"]["batchId"] == version["id"]
+    assert archive.items[0]["source_snapshot"]["moduleId"] == "hero"
     result = await service.projects.get_asset(UUID(new_id), service.scope)
     assert result.source_asset_id == white.id
     await service.select(project.id, step["id"], 0, str(old.id))

@@ -13,6 +13,54 @@ from backend.app.core.identity import IdentityContext, LocalSingleUserIdentityPr
 from backend.app.core.errors import AppError
 
 
+class _Rows:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def mappings(self):
+        return self
+
+    def __iter__(self):
+        return iter(self.rows)
+
+
+class _ProductListSession:
+    def __init__(self):
+        self.queries: list[str] = []
+
+    async def execute(self, statement, _params=None):
+        query = str(statement)
+        self.queries.append(query)
+        if "FROM project_workbench.products" in query:
+            return _Rows([
+                {"id": UUID(int=801), "library_id": UUID(int=800), "workspace_id": UUID(int=1), "name": "产品 A", "project_id": UUID(int=811), "archived_at": None},
+                {"id": UUID(int=802), "library_id": UUID(int=800), "workspace_id": UUID(int=1), "name": "产品 B", "project_id": UUID(int=812), "archived_at": None},
+            ])
+        if "FROM project_workbench.product_versions" in query:
+            return _Rows([
+                {"id": UUID(int=821), "product_id": UUID(int=801), "product_type": "hero", "source_snapshot": {}, "preview_url": "/hero", "status": "published", "created_at": None},
+                {"id": UUID(int=822), "product_id": UUID(int=802), "product_type": "detail", "source_snapshot": {}, "preview_url": "/detail", "status": "published", "created_at": None},
+            ])
+        raise AssertionError(f"unexpected query: {query}")
+
+
+class _ProductListSessions:
+    def __init__(self, session):
+        self.session = session
+
+    def __call__(self):
+        outer = self
+
+        class Context:
+            async def __aenter__(self):
+                return outer.session
+
+            async def __aexit__(self, *_args):
+                return False
+
+        return Context()
+
+
 @pytest.mark.asyncio
 async def test_production_library_crud_and_publish_is_idempotent():
     workspace_id = UUID(int=71)
@@ -30,6 +78,21 @@ async def test_production_library_crud_and_publish_is_idempotent():
     assert len(await service.list_versions(product.id, product_type="hero", status="published")) == 1
     await service.archive_version(product.id, published.id)
     assert await service.list_versions(product.id, status="published") == []
+
+
+@pytest.mark.asyncio
+async def test_sql_product_list_preloads_versions_in_one_query() -> None:
+    session = _ProductListSession()
+    service = SqlAlchemyProductLibraryService(
+        _ProductListSessions(session),
+        LocalSingleUserIdentityProvider(IdentityContext(UUID(int=1), UUID(int=1), "owner")),
+    )
+
+    products = await service.list_products(UUID(int=800))
+
+    assert [item.name for item in products] == ["产品 A", "产品 B"]
+    assert [item.versions[0].id for item in products] == [UUID(int=821), UUID(int=822)]
+    assert sum("FROM project_workbench.product_versions" in query for query in session.queries) == 1
 
 
 @pytest.mark.asyncio

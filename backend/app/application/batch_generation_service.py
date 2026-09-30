@@ -1,3 +1,5 @@
+from .style_seed_catalog import resolve_marketplace_style_seed
+from .regular_design import regular_snapshot, RECIPE
 from dataclasses import asdict, dataclass, field
 from hashlib import sha256
 from typing import Any
@@ -26,7 +28,6 @@ from .module_planning_v2 import (
     normalize_custom_style,
     parse_v2_result,
     render_v2_module_prompt,
-    resolve_style_seed,
     task_outline_from_master,
 )
 
@@ -39,6 +40,7 @@ class BatchHeroModuleInput:
     task_id: str | None = None
     reverse_reference: dict[str, Any] | None = None
     task_design: dict[str, Any] | None = None
+    regular_task: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -54,6 +56,8 @@ class BatchHeroPromptCompilationInput:
     custom_style: str = ""
     module_plan_id: UUID | None = None
     reverse_version_id: UUID | None = None
+    creation_mode: str = "professional"
+    user_notes: str = ""
 
 
 class BatchHeroPromptCompilationService:
@@ -119,6 +123,8 @@ class BatchHeroPromptCompilationService:
             if self.module_planning is None:
                 raise AppError("MODULE_PLANNER_UNAVAILABLE", "自动规划服务不可用", 503)
             master_snapshot = await self.module_planning.snapshot(project_id, request.module_plan_id, "hero")
+        if master_snapshot and (master_snapshot.get("planningContractVersion") == "regular-design-v1") != (request.creation_mode == "regular"):
+            raise AppError("MODULE_PLAN_MODE_MISMATCH", "规划模式不匹配，请重新规划", 409)
         request_reverse_version = str(request.reverse_version_id) if request.reverse_version_id else None
         master_reverse_version = (
             str(master_snapshot.get("input", {}).get("reverseVersionId"))
@@ -172,7 +178,7 @@ class BatchHeroPromptCompilationService:
             )
         style = _find_style(config.get("styleCategories"), request.style_id)
         custom_style = normalize_custom_style(request.custom_style)
-        style_seed = resolve_style_seed(style)
+        style_seed = (await resolve_marketplace_style_seed(style, self.prompt_repository))
         cards = await resolve_constraint_cards(
             config,
             market_id=request.market_id,
@@ -186,7 +192,7 @@ class BatchHeroPromptCompilationService:
         if stored.content_type != source_object.media_type:
             raise AppError("INVALID_SOURCE_ASSET", "源图元数据不一致", 409)
 
-        bound = await self.prompt_models.bind(config, self.prompt_compiler) if self.prompt_models else None
+        bound = await self.prompt_models.bind(config, self.prompt_compiler) if self.prompt_models and request.creation_mode != "regular" else None
         prompt_compiler = bound.compiler if bound else self.prompt_compiler
         prompt_connection = bound.snapshot if bound else None
         module_inputs: list[GenerationModuleInput] = []
@@ -212,6 +218,12 @@ class BatchHeroPromptCompilationService:
             if module.get("mode") != "hero":
                 raise AppError("GENERATION_CONFIG_SELECTION_INVALID", "主图模块选择无效", 400)
             parameters = _normalize_parameters(selected.module_parameters)
+            if request.creation_mode == "regular":
+                module_snapshot = regular_snapshot(request, selected, master_snapshot, module, parameters, market, style, cards)
+                module_snapshot["selection"].update(modelPreset=model, providerModel=connection["modelName"] if connection else self.provider_model, **({"modelConnection":connection} if connection else {}))
+                module_inputs.append(GenerationModuleInput(selected.task_id or selected.module_id, selected.result_count, module_snapshot))
+                planned.append((selected, module, parameters, {"system":"", "user":module_snapshot["compiledTaskPrompt"]}, ()))
+                continue
             task_id = selected.task_id or selected.module_id
             task_outline = task_outline_from_master(master_snapshot, task_id, selected.module_id)
             reverse_reference = selected.reverse_reference
@@ -329,9 +341,11 @@ class BatchHeroPromptCompilationService:
             )
 
         snapshot = {
+            "creationMode":request.creation_mode,
+            **({"recipe":dict(RECIPE)} if request.creation_mode == "regular" else {}),
             "runtimeModules": runtime_catalog_snapshot(config),
-            "plannerVersion": PLANNER_VERSION_V2,
-            "designKnowledge": design_knowledge_context(load_design_knowledge()),
+            "plannerVersion": "regular-design-v1" if request.creation_mode == "regular" else PLANNER_VERSION_V2,
+            **({"designKnowledge": design_knowledge_context(load_design_knowledge())} if request.creation_mode != "regular" else {}),
             "styleSeed": style_seed.to_snapshot(),
             **({"planningMaster": master_snapshot} if master_snapshot else {}),
             **({"reversePlanning": reverse_overview} if reverse_overview else {}),
@@ -353,6 +367,12 @@ class BatchHeroPromptCompilationService:
         compilations: dict[str, GenerationModuleCompilation] = {}
         for selected, _module, _parameters, prompts, reverse_image_inputs in planned:
             try:
+                if request.creation_mode == "regular":
+                    module_input = next(item for item in module_inputs if item.module_key == (selected.task_id or selected.module_id))
+                    rendered = module_input.snapshot.get("compiledTaskPrompt", "")
+                    compilations[selected.task_id or selected.module_id] = GenerationModuleCompilation(rendered, {"creationMode": "regular", "recipe": "local-regular-adapted-v1"})
+                    await self.batch_repository.save_planning_snapshot(batch.id, workspace_id, snapshot, {item.module_key: item.snapshot for item in module_inputs})
+                    continue
                 result = await prompt_compiler.compile(
                     PromptCompileRequest(
                         system_prompt=prompts["system"], user_prompt=prompts["user"],

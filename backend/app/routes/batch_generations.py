@@ -18,6 +18,7 @@ def _batch_view(batch) -> dict:
     return {
         "id": str(batch.id), "projectId": str(batch.project_id),
         "sourceAssetId": str(batch.source_asset_id), "status": batch.status,
+        "creationMode": batch.snapshot.get("creationMode", "professional"),
         "plannerVersion": batch.snapshot.get("plannerVersion", "v2"),
         "kind": getattr(batch, "kind", "hero"), "sourcePlanId": str(getattr(batch, "source_plan_id", None)) if getattr(batch, "source_plan_id", None) else None,
         "createdAt": batch.created_at.isoformat(), "updatedAt": batch.updated_at.isoformat(),
@@ -97,6 +98,7 @@ async def compile_batch(project_id: UUID, payload: BatchHeroPromptCompileInput, 
             source_asset_id=payload.sourceAssetId, market_id=payload.marketId, model_id=payload.modelId,
             style_id=payload.styleId, aspect_ratio=payload.aspectRatio, resolution=payload.resolution,
             output_language=payload.outputLanguage, custom_style=payload.customStyle,
+            creation_mode=payload.creationMode, user_notes=payload.userNotes,
             module_plan_id=payload.modulePlanId,
             reverse_version_id=payload.reverseVersionId,
             modules=[BatchHeroModuleInput(item.moduleId, item.resultCount, [
@@ -104,7 +106,7 @@ async def compile_batch(project_id: UUID, payload: BatchHeroPromptCompileInput, 
             ], task_id=item.taskId, task_design=item.taskDesign.model_dump(exclude_none=True) if item.taskDesign else None, reverse_reference=(
                 item.reverseReference.model_dump(mode="python")
                 if item.reverseReference else None
-            )) for item in payload.modules],
+            ), regular_task=item.regularTask) for item in payload.modules],
         ),
         idempotency_key or "",
     )

@@ -81,6 +81,9 @@ class ProductLibraryService:
     async def list_products(self, library_id: UUID, include_archived=False):
         return [x for x in self.products.values() if x.library_id == library_id and x.workspace_id == self._workspace() and (include_archived or x.archived_at is None)]
 
+    async def count_products(self, library_id: UUID, include_archived=False) -> int:
+        return len(await self.list_products(library_id, include_archived))
+
     async def archive_product(self, product_id: UUID):
         item = self.products.get(product_id)
         if item is None or item.workspace_id != self._workspace(): raise AppError("PRODUCT_NOT_FOUND", "正式产品不存在", 404)
@@ -136,8 +139,9 @@ class ProductLibraryService:
         self.asset_links[key] = link
         return link
 
-    async def list_product_asset_links(self, product_id: UUID):
-        await self.get_product(product_id)
+    async def list_product_asset_links(self, product_id: UUID, *, validate: bool = True):
+        if validate:
+            await self.get_product(product_id)
         return sorted(
             (
                 item for item in self.asset_links.values()
@@ -265,6 +269,38 @@ class SqlAlchemyProductLibraryService:
         result.versions = await self._versions(result.id)
         return result
 
+    async def _products(self, rows):
+        products = [
+            ProductionProductRecord(
+                row["id"], row["library_id"], row["workspace_id"], row["name"],
+                row["project_id"], row["archived_at"],
+            )
+            for row in rows
+        ]
+        if not products:
+            return products
+        async with self.sessions() as session:
+            versions = await session.execute(
+                text(
+                    "SELECT id, product_id, product_type, source_snapshot, preview_url, status, created_at "
+                    "FROM project_workbench.product_versions "
+                    "WHERE product_id = ANY(CAST(:product_ids AS uuid[])) "
+                    "ORDER BY product_id, version_number"
+                ),
+                {"product_ids": [str(item.id) for item in products]},
+            )
+            grouped: dict[UUID, list[ProductionVersionRecord]] = {item.id: [] for item in products}
+            for row in versions.mappings():
+                grouped[row["product_id"]].append(
+                    ProductionVersionRecord(
+                        row["id"], row["product_id"], row["product_type"],
+                        row["source_snapshot"], row["preview_url"], row["status"], row["created_at"],
+                    )
+                )
+        for product in products:
+            product.versions = grouped[product.id]
+        return products
+
     async def create_library(self, name: str, description: str = ""):
         if not name.strip(): raise AppError("PRODUCT_LIBRARY_NAME_REQUIRED", "产品库名称不能为空", 400)
         async with self.sessions() as session, session.begin():
@@ -288,7 +324,20 @@ class SqlAlchemyProductLibraryService:
         clause = "" if include_archived else " AND archived_at IS NULL"
         async with self.sessions() as session:
             rows = await session.execute(text("SELECT id, library_id, workspace_id, name, project_id, archived_at FROM project_workbench.products WHERE library_id=:library AND workspace_id=:workspace" + clause + " ORDER BY created_at"), {"library": library_id, "workspace": self._workspace()})
-            return [await self._product(row) for row in rows.mappings()]
+            product_rows = list(rows.mappings())
+        return await self._products(product_rows)
+
+    async def count_products(self, library_id: UUID, include_archived=False) -> int:
+        clause = "" if include_archived else " AND archived_at IS NULL"
+        async with self.sessions() as session:
+            value = await session.scalar(
+                text(
+                    "SELECT count(*) FROM project_workbench.products "
+                    "WHERE library_id=:library AND workspace_id=:workspace" + clause
+                ),
+                {"library": library_id, "workspace": self._workspace()},
+            )
+        return int(value or 0)
 
     async def create_product(self, library_id: UUID, name: str, project_id: UUID | None = None):
         await self.get_library(library_id)
@@ -622,15 +671,28 @@ class SqlAlchemyProductLibraryService:
             return ProductAssetLinkRecord(**value)
 
     async def list_product_asset_links(
-        self, product_id: UUID
+        self, product_id: UUID, *, validate: bool = True
     ) -> list[ProductAssetLinkRecord]:
-        await self.get_product(product_id)
+        if validate:
+            async with self.sessions() as session:
+                exists = await session.scalar(
+                    text(
+                        "SELECT 1 FROM project_workbench.products "
+                        "WHERE id=:product AND workspace_id=:workspace"
+                    ),
+                    {"product": product_id, "workspace": self._workspace()},
+                )
+            if exists is None:
+                raise AppError("PRODUCT_NOT_FOUND", "正式产品不存在", 404)
         async with self.sessions() as session:
             rows = await session.execute(
                 text(
-                    "SELECT id, workspace_id, project_id, product_id, project_asset_id, "
-                    "created_at FROM project_workbench.product_asset_links "
-                    "WHERE product_id=:product AND workspace_id=:workspace ORDER BY created_at, id"
+                    "SELECT links.id, links.workspace_id, links.project_id, links.product_id, links.project_asset_id, "
+                    "links.created_at FROM project_workbench.product_asset_links links "
+                    "JOIN project_workbench.products products ON products.id=links.product_id "
+                    "AND products.workspace_id=:workspace "
+                    "WHERE links.product_id=:product AND links.workspace_id=:workspace "
+                    "ORDER BY links.created_at, links.id"
                 ),
                 {"product": product_id, "workspace": self._workspace()},
             )

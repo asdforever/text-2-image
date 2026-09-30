@@ -134,3 +134,42 @@ async def test_invalid_later_brush_mask_fails_before_text_provider_call():
     with pytest.raises(AppError):
         await execute_operations(png("white"), operations, editor, ratio="1:1", resolution="标准 1K", connection=None)
     assert editor.requests == []
+
+
+@pytest.mark.asyncio
+async def test_prompt_edit_sends_current_image_without_mask_and_can_be_cropped():
+    editor = Editor()
+    result, prompt = await execute_operations(png("red"), [
+        op("prompt_edit", prompt="把背景变成木质桌面，保留商品和文字"),
+        op("crop_resize", region={"x": 0, "y": 0, "width": 1, "height": 1}, width=50, height=40),
+    ], editor, ratio="4:3", resolution="标准 1K", connection=None)
+    assert len(editor.requests) == 1
+    request = editor.requests[0]
+    assert len(request.ordered_image_inputs()) == 1
+    assert Image.open(BytesIO(request.image_bytes)).convert("RGB").getpixel((0, 0)) == (255, 0, 0)
+    assert "木质桌面" in prompt and "保留商品和文字" in prompt
+    assert "选区外" not in prompt
+    output = Image.open(BytesIO(result)).convert("RGB")
+    assert output.size == (50, 40)
+    assert output.getpixel((0, 0)) == (0, 0, 255)
+
+
+@pytest.mark.parametrize("prompt", ["", "   ", None, {}, "x" * 8001])
+def test_prompt_edit_rejects_empty_or_invalid_instruction(prompt):
+    with pytest.raises(AppError):
+        validate_operations([op("prompt_edit", prompt=prompt)])
+
+
+@pytest.mark.asyncio
+async def test_prompt_edit_then_brush_uses_edited_image_and_preserves_outside_mask():
+    class SequenceEditor(Editor):
+        async def edit(self, request):
+            self.requests.append(request)
+            return ImageEditResult(png("blue" if len(self.requests) == 1 else "green"), "image/png", {})
+    editor = SequenceEditor()
+    result, _ = await execute_operations(png("red"), [op("prompt_edit", prompt="更换背景"), op("redraw", strokes=[{"mode": "draw", "width": .2, "points": [{"x": .5, "y": .5}]}], prompt="改成绿色", feather=0)], editor, ratio="4:3", resolution="标准 1K", connection=None)
+    assert len(editor.requests) == 2
+    assert Image.open(BytesIO(editor.requests[1].image_bytes)).convert("RGB").getpixel((0, 0)) == (0, 0, 255)
+    output = Image.open(BytesIO(result)).convert("RGB")
+    assert output.getpixel((0, 0)) == (0, 0, 255)
+    assert output.getpixel((50, 40)) == (0, 128, 0)

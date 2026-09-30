@@ -1,3 +1,5 @@
+from .style_seed_catalog import resolve_marketplace_style_seed
+from .regular_design import regular_snapshot, RECIPE
 from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 from uuid import UUID
@@ -17,7 +19,7 @@ from .design_knowledge import design_knowledge_context, load_design_knowledge
 from .module_planning_v2 import (
     PLANNER_VERSION_V2, build_v2_compiler_prompts, freeze_v2_module_planning,
     normalize_custom_style, parse_v2_result, render_v2_module_prompt,
-    resolve_style_seed, task_outline_from_master,
+    task_outline_from_master,
 )
 
 
@@ -29,6 +31,7 @@ class SuitePlanModuleInput:
     task_id: str | None = None
     reverse_reference: dict[str, Any] | None = None
     task_design: dict[str, Any] | None = None
+    regular_task: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -46,6 +49,7 @@ class SuitePlanCompilationInput:
     references: list[PlanningReferenceRequest] = field(default_factory=list)
     module_plan_id: UUID | None = None
     reverse_version_id: UUID | None = None
+    creation_mode: Literal["regular", "professional"] = "professional"
 
 
 @dataclass(frozen=True)
@@ -135,6 +139,8 @@ class SuitePlanningService:
             if self.module_planning is None:
                 raise AppError("MODULE_PLANNER_UNAVAILABLE", "自动规划服务不可用", 503)
             master_snapshot = await self.module_planning.snapshot(project_id, request.module_plan_id, "suite")
+        if master_snapshot and (master_snapshot.get("planningContractVersion") == "regular-design-v1") != (request.creation_mode == "regular"):
+            raise AppError("MODULE_PLAN_MODE_MISMATCH", "规划模式不匹配，请重新规划", 409)
         request_reverse_version = str(request.reverse_version_id) if request.reverse_version_id else None
         master_reverse_version = (
             str(master_snapshot.get("input", {}).get("reverseVersionId"))
@@ -186,7 +192,7 @@ class SuitePlanningService:
         if model.get("aspectRatios") and request.aspect_ratio not in model["aspectRatios"]:
             raise AppError("GENERATION_CONFIG_SELECTION_INVALID", "图片比例不属于所选模型", 400)
         style = _find_style(config.get("styleCategories"), request.style_id)
-        seed = resolve_style_seed(style)
+        seed = (await resolve_marketplace_style_seed(style, self.prompt_repository))
         custom_style = normalize_custom_style(request.custom_style)
         cards = await resolve_constraint_cards(
             config,
@@ -197,7 +203,7 @@ class SuitePlanningService:
         )
         references = await self.reference_resolver.resolve(workspace_id, request.references)
 
-        bound = await self.prompt_models.bind(config, self.planner_compiler) if self.prompt_models else None
+        bound = await self.prompt_models.bind(config, self.planner_compiler) if self.prompt_models and request.creation_mode != "regular" else None
         planner_compiler = bound.compiler if bound else self.planner_compiler
         prompt_connection = bound.snapshot if bound else None
         module_inputs: list[RepositoryModuleInput] = []
@@ -218,6 +224,11 @@ class SuitePlanningService:
             if module.get("mode") != "suite":
                 raise AppError("SUITE_PLAN_INVALID_INPUT", "详情页模块选择无效", 400)
             parameters = _normalize_parameters(selected.module_parameters)
+            if request.creation_mode == "regular":
+                module_snapshot = regular_snapshot(request, selected, master_snapshot, module, parameters, market, style, cards)
+                module_inputs.append(RepositoryModuleInput(selected.task_id or selected.module_id, len(module_inputs)+1, selected.result_count, module_snapshot["title"], parameters, module_snapshot))
+                module_context.append((selected, module, parameters, references, "", module_snapshot["compiledTaskPrompt"], [], []))
+                continue
             task_outline = task_outline_from_master(
                 master_snapshot, selected.task_id or selected.module_id, selected.module_id
             )
@@ -341,9 +352,11 @@ class SuitePlanningService:
             for asset, source_object, _stored in source_records
         ]
         snapshot = {
+            "creationMode":request.creation_mode,
+            **({"recipe":dict(RECIPE)} if request.creation_mode == "regular" else {}),
             "runtimeModules": runtime_catalog_snapshot(config),
-            "plannerVersion": PLANNER_VERSION_V2,
-            "designKnowledge": design_knowledge_context(load_design_knowledge()),
+            "plannerVersion": "regular-design-v1" if request.creation_mode == "regular" else PLANNER_VERSION_V2,
+            **({"designKnowledge": design_knowledge_context(load_design_knowledge())} if request.creation_mode != "regular" else {}),
             "styleSeed": seed.to_snapshot(),
             **({"planningMaster": master_snapshot} if master_snapshot else {}),
             **({"reversePlanning": reverse_overview} if reverse_overview else {}),
@@ -392,6 +405,18 @@ class SuitePlanningService:
                 reverse_mimes,
             ) in module_context:
                 module_input = next(item for item in module_inputs if item.module_key == (selected.task_id or selected.module_id))
+                if request.creation_mode == "regular":
+                    rendered = module_input.prompt_snapshot.get("compiledTaskPrompt", "")
+                    compilations[selected.task_id or selected.module_id] = SuitePlanModuleCompilation(
+                        copy_summary=(selected.regular_task or {}).get("copy", ""),
+                        visual_direction=(selected.regular_task or {}).get("goal", ""),
+                        task_prompt=rendered,
+                        compiler_output={"creationMode": "regular", "recipe": "local-regular-adapted-v1"},
+                    )
+                    await self.plan_repository.save_planning_snapshot(
+                        plan.id, workspace_id, snapshot, {item.module_key: item.prompt_snapshot for item in module_inputs},
+                    )
+                    continue
                 result = await planner_compiler.compile(
                     SuitePlanCompilerRequest(
                         module_id=selected.module_id,

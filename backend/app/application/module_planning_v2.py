@@ -254,14 +254,21 @@ class StyleSeed:
     version: str
     text: str
     sha256: str
+    prompt_template_id: str | None = None
+    prompt_version_id: str | None = None
+    prompt_version_no: int | None = None
+    prompt_content_sha256: str | None = None
 
-    def to_snapshot(self) -> dict[str, str]:
+    def to_snapshot(self) -> dict[str, Any]:
         return {
             "seedId": self.seed_id,
             "styleId": self.style_id,
             "version": self.version,
             "text": self.text,
             "sha256": self.sha256,
+            **({"promptTemplateId": self.prompt_template_id, "promptVersionId": self.prompt_version_id,
+                "versionNo": self.prompt_version_no, "contentSha256": self.prompt_content_sha256}
+               if self.prompt_version_id else {}),
         }
 
 

@@ -49,3 +49,21 @@ docker compose -p text-2-image run --rm api python -m backend.cli migrate
 - `.drone.yml` 里两处 `/srv/text-2-image` 与目录实际位置要一致。
 - 共用服务器上：不要 `docker system prune` / `image prune -a`；
   `docker compose down` 要带 `-p text-2-image`。
+
+
+## 商城风格种子
+
+```bash
+python -m backend.cli import-style-seeds
+```
+
+将 21 个内置风格种子导入提示词商城的“风格库”，每个风格一个模板，稳定编号为
+`picagent.style-seed.<styleId>`。命令可重复执行，只补缺失模板，不覆盖已有正文、默认版本或分类。
+
+工作台中的风格名称及分组仍来自生成配置。主图、套图和规划的新请求按风格 ID 读取商城模板的
+默认版本，并将正文、模板 ID、版本 ID、版本号及哈希冻结进任务快照。常规版和专业版均使用
+商城风格正文。编辑保存新版本或切换默认版本后，下一次新编译生效；确认、重试和历史回放使用
+原快照。已完成的规划如需采用更新风格，应重新规划。
+
+未导入的旧安装仍使用原内置种子；自定义风格保留配置描述。已导入模板若默认版本无效或正文为空，
+生成会报错而不会悄悄改用内置正文。风格种子是生成上下文的一部分，不能直接作为完整生图提示词测试。

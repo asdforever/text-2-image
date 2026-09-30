@@ -1,3 +1,4 @@
+from .regular_design import render_regular
 from hashlib import sha256
 from typing import Any
 from uuid import UUID
@@ -38,6 +39,11 @@ class BatchGenerationConfirmationService:
         if set(normalized) != expected or any(not prompt for prompt in normalized.values()):
             raise AppError("BATCH_GENERATION_INVALID_INPUT", "模块实时提示词不完整", 400)
         for task in detail.module_tasks:
+            if task.snapshot.get("creationMode") == "regular":
+                rendered = render_regular(task.snapshot)
+                if normalized[task.module_key] != rendered:
+                    raise AppError("BATCH_GENERATION_REGULAR_PROMPT_IMMUTABLE", "常规模式提示词由服务端生成，确认时不能修改", 409)
+                continue
             rendered = render_v2_from_snapshot(task.snapshot)
             if task.compiled_task_prompt != rendered:
                 raise AppError(
@@ -57,7 +63,7 @@ class BatchGenerationConfirmationService:
         confirmations: dict[str, GenerationModuleConfirmation] = {}
         for task in detail.module_tasks:
             task_prompt = normalized[task.module_key]
-            final_prompt = compose_v2_from_snapshot(task.snapshot)
+            final_prompt = render_regular(task.snapshot) if task.snapshot.get("creationMode") == "regular" else compose_v2_from_snapshot(task.snapshot)
             confirmations[task.module_key] = GenerationModuleConfirmation(
                 task_prompt=task_prompt,
                 final_prompt=final_prompt,

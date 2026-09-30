@@ -1,5 +1,6 @@
 """Plan page structure once; module compilers own the execution detail."""
 import asyncio
+from .style_seed_catalog import resolve_marketplace_style_seed
 from dataclasses import dataclass
 import json
 import logging
@@ -19,7 +20,6 @@ from .planning_skills import load_planning_skill
 from .commerce_design import commerce_design_context
 from .runtime_module_catalog import runtime_module_catalog, runtime_catalog_snapshot
 from .hero_prompting import _find_style
-from .module_planning_v2 import resolve_style_seed
 
 
 logger = logging.getLogger(__name__)
@@ -37,12 +37,32 @@ class ModulePlanInput(BaseModel):
     reverseVersionId: UUID | None = None
     styleId: str | None
     customStyle: str = Field(max_length=2000)
+    creationMode: Literal["regular", "professional"] = "professional"
+    selectedModules: list[dict[str, str]] = Field(default_factory=list, max_length=8)
+    userNotes: str = Field(default="", max_length=4000)
 
 
 class Parameter(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     key: str = Field(min_length=1, max_length=60)
     value: str = Field(min_length=1, max_length=500)
+
+
+class RegularModule(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    taskId: str = Field(min_length=1, max_length=100)
+    moduleId: str = Field(min_length=1, max_length=100)
+    taskTitle: str = Field(min_length=1, max_length=80)
+    reason: str = Field(min_length=1, max_length=500)
+    suggestedCopy: str = Field(default="", max_length=2000)
+    moduleParameters: list[Parameter] = Field(default_factory=list, max_length=19)
+
+
+class RegularOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    summary: str = Field(min_length=1, max_length=2000)
+    modules: list[RegularModule] = Field(min_length=1, max_length=8)
+    warnings: list[str] = Field(default_factory=list, max_length=50)
 
 
 class PlannedModule(BaseModel):
@@ -69,6 +89,7 @@ class PlannedModule(BaseModel):
     bigIdea: str = Field(min_length=1, max_length=500)
     visualMechanism: str = Field(min_length=1, max_length=500)
     referenceModuleId: str | None = Field(default=None, min_length=1, max_length=200)
+    suggestedCopy: str = Field(default="", max_length=500)
 
     @model_validator(mode="after")
     def validate_style_selection(self):
@@ -137,7 +158,7 @@ class ModulePlanningService:
         value = await self.get(project, plan_id)
         if value["mode"] != mode or value["status"] != "completed":
             raise AppError("MODULE_PLAN_NOT_READY", "自动规划尚未完成或类型不匹配", 409)
-        if value.get("planningContractVersion") != "commerce-design-v1":
+        if value.get("planningContractVersion") not in {"commerce-design-v1", "regular-design-v1"}:
             raise AppError("MODULE_PLAN_NOT_READY", "请重新规划后生成图片", 409)
         return value
 
@@ -152,10 +173,15 @@ class ModulePlanningService:
         if (len(payload.referenceAssetIds) > 12 or len(set(payload.referenceAssetIds)) != len(payload.referenceAssetIds)
                 or set(payload.sourceAssetIds) & set(payload.referenceAssetIds)):
             raise AppError("MODULE_PLAN_INVALID_INPUT", "参考图不能重复或与产品图重叠，最多 12 张", 400)
-        initial = dict(mode=payload.mode, status="planning", summary="", modules=[], warnings=[],
-                       planningContractVersion="commerce-design-v1",
+        if payload.selectedModules:
+            identities = [(item.get("taskId", ""), item.get("moduleId", "")) for item in payload.selectedModules]
+            if any(not task.strip() or not module.strip() or len(task)>100 or len(module)>100 for task,module in identities) or len({task for task,_ in identities}) != len(identities):
+                raise AppError("MODULE_PLAN_INVALID_INPUT", "所选模块任务标识无效", 400)
+        contract = "regular-design-v1" if payload.creationMode == "regular" else "commerce-design-v1"
+        initial = dict(mode=payload.mode, creationMode=payload.creationMode, status="planning", summary="", modules=[], warnings=[],
+                       planningContractVersion=contract,
                        input=payload.model_dump(mode="json"), error=None)
-        fingerprint_input = dict(initial["input"], planningContractVersion="commerce-design-v1")
+        fingerprint_input = dict(initial["input"], planningContractVersion=contract)
         if not fingerprint_input["referenceAssetIds"]:
             fingerprint_input.pop("referenceAssetIds")
         if fingerprint_input.get("reverseVersionId") is None:
@@ -198,13 +224,34 @@ class ModulePlanningService:
         published = await self.config.get_published()
         config = published.content
         catalog = runtime_module_catalog(config, payload.mode)
+        if payload.creationMode == "regular":
+            selected_style = None
+            if payload.styleId:
+                style = _find_style(config.get("styleCategories"), payload.styleId)
+                seed = await resolve_marketplace_style_seed(style, self.prompts)
+                selected_style = {"id": style["id"], "seed": seed.to_snapshot(), "customStyle": payload.customStyle}
+            bound = await self.prompt_models.bind(config, self.planner) if self.prompt_models else None
+            planner = bound.compiler if bound else self.planner
+            system = ("你是轻量电商内容规划师。只依据当前商品图片和用户商品事实分配模块内容；不得编造参数、价格、认证或功效。"
+                      "明确选择时保留全部 taskId/moduleId 和顺序；空选择时推荐合适模块。每项只返回内容目标 reason、建议文案 suggestedCopy、"
+                      "分配到此模块的商品参数 moduleParameters 和标题。不制定构图、字体、视觉架构。只返回符合 outputSchema 的 JSON。")
+            context = {**payload.model_dump(mode="json"), "moduleCatalog": catalog,
+                       "imageRoles":roles, "selectedStyle":selected_style, "outputSchema":RegularOutput.model_json_schema()}
+            user = json.dumps(context, ensure_ascii=False)
+            value["snapshot"] = {"creationMode":"regular", "selectedStyle":selected_style, "sourceAssets":sources, "referenceAssets":references,
+                                 "generationConfig":{"version":published.version_no,"contentSha256":published.content_sha256},
+                                 "systemPrompt":system,"userPrompt":user,
+                                 "promptModelConnection":bound.snapshot if bound else None}
+            await self.repository.save(self.workspace, project, UUID(value["id"]), value)
+            raw = await planner.plan_modules(ModuleMasterRequest(system, user, images, mimes))
+            return self._regular_result(payload, catalog, value, raw)
         knowledge = design_knowledge_context(load_design_knowledge())
         commerce = commerce_design_context()
         selected_style = None
         if payload.styleId:
             style = _find_style(config.get("styleCategories"), payload.styleId)
             selected_style = {"id": style["id"], "description": style.get("description", ""),
-                              "seed": resolve_style_seed(style).to_snapshot(), "customStyle": payload.customStyle}
+                              "seed": (await resolve_marketplace_style_seed(style, self.prompts)).to_snapshot(), "customStyle": payload.customStyle}
         market = _find_by_id(config["markets"], payload.marketId, "电商平台")
         market_card = await _resolve_bound_card(fallback=market["guidance"], fallback_source="market_guidance",
             binding=config.get("marketBindings", {}).get(payload.marketId), prompt_repository=self.prompts)
@@ -267,6 +314,25 @@ class ModulePlanningService:
                     "validationErrors": failures, "previousOutput": raw,
                 }}, ensure_ascii=False)
         raise AppError("MODULE_PLANNER_INVALID_RESPONSE", "规划结果纠正后仍无效，请重新规划", 502)
+
+    @staticmethod
+    def _regular_result(payload, catalog, value, raw=None):
+        result = RegularOutput.model_validate(raw).model_dump()
+        modules = result["modules"]
+        allowed = {item["id"] for item in catalog}
+        identities = [(m["taskId"], m["moduleId"]) for m in modules]
+        if any(module_id not in allowed for _, module_id in identities) or len({task_id for task_id, _ in identities}) != len(identities):
+            raise AppError("MODULE_PLANNER_INVALID_RESPONSE", "规划模块无效", 502)
+        if payload.selectedModules:
+            expected = [(m["taskId"], m["moduleId"]) for m in payload.selectedModules]
+            if set(identities) != set(expected):
+                raise AppError("MODULE_PLANNER_INVALID_RESPONSE", "规划未保留所选模块", 502)
+            modules = sorted(modules, key=lambda m: expected.index((m["taskId"], m["moduleId"])))
+        for module in modules:
+            module.update(resultCount=1, designGuideIds=[], compositionBrief="", informationQuestion="",
+                          productPresence="full", styleTemplateId="", bigIdea="", visualMechanism="")
+        return {**result, "modules": modules, "creationMode":"regular", "planningContractVersion":"regular-design-v1",
+                "sharedVisualDirection":"", "visualRhythm":[], "productPresencePlan":[], "layoutFamilies":[]}
 
     @staticmethod
     def _validate_output(raw, mode, catalog, reverse_module_ids: set[str] | None = None):

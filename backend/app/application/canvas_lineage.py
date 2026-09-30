@@ -69,6 +69,7 @@ async def canvas_generation_steps(project_id, workspace_id, assets, batches, edi
                 "id": key, "kind": "hero" if selection.get("module", {}).get("mode") == "hero" else batch.kind,
                 "batchStatus": batch.status,
                 "batchId": str(batch.id),
+                "creationMode": batch.snapshot.get("creationMode", "professional"),
                 "batchCreatedAt": batch.created_at.isoformat(),
                 "title": design.get("taskTitle") or module.snapshot.get("title") or selection.get("module", {}).get("label") or selection.get("module", {}).get("name") or "图片生成",
                 "sourceAssetIds": [str(item["assetId"]) for item in (sources or []) if isinstance(item, dict) and item.get("assetId")],

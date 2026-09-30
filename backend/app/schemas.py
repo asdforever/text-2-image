@@ -68,6 +68,7 @@ class BatchHeroModuleInput(BaseModel):
     resultCount: int = Field(ge=1, le=4)
     moduleParameters: list[HeroModuleParameterInput] = Field(default_factory=list, max_length=20)
     reverseReference: "ReverseModuleReferenceInput | None" = None
+    regularTask: dict[str, str] | None = None
 
 
 class BatchHeroPromptCompileInput(BaseModel):
@@ -84,6 +85,8 @@ class BatchHeroPromptCompileInput(BaseModel):
     modules: list[BatchHeroModuleInput] = Field(min_length=1, max_length=20)
     modulePlanId: UUID | None = None
     reverseVersionId: UUID | None = None
+    creationMode: Literal["regular", "professional"] = "professional"
+    userNotes: str = Field(default="", max_length=4000)
 
 
 class BatchGenerationConfirmInput(BaseModel):
@@ -115,6 +118,7 @@ class SuitePlanModuleCompileInput(BaseModel):
     resultCount: int = Field(ge=1, le=4)
     moduleParameters: list[HeroModuleParameterInput] = Field(default_factory=list, max_length=20)
     reverseReference: ReverseModuleReferenceInput | None = None
+    regularTask: dict[str, str] | None = None
 
 
 class SuitePlanCompileInput(BaseModel):
@@ -132,6 +136,7 @@ class SuitePlanCompileInput(BaseModel):
     reverseVersionId: UUID | None = None
     userNotes: str = Field(default="", max_length=4000)
     customStyle: str = Field(default="", max_length=500)
+    creationMode: Literal["regular", "professional"] = "professional"
     references: list[SuitePlanningReferenceInput] = Field(default_factory=list, max_length=20)
 
 

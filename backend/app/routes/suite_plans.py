@@ -27,6 +27,7 @@ def _plan_view(detail) -> dict:
         "id": str(plan.id),
         "projectId": str(plan.project_id),
         "status": plan.status,
+        "creationMode": plan.snapshot.get("creationMode", "professional"),
         "plannerVersion": plan.snapshot.get("plannerVersion", "v2"),
         "revision": plan.revision,
         "snapshot": plan.snapshot,
@@ -98,6 +99,7 @@ async def compile_suite_plan(
                         item.reverseReference.model_dump(mode="python")
                         if item.reverseReference else None
                     ),
+                    regular_task=item.regularTask,
                 )
                 for item in payload.modules
             ],
@@ -105,6 +107,7 @@ async def compile_suite_plan(
             module_plan_id=payload.modulePlanId,
             reverse_version_id=payload.reverseVersionId,
             custom_style=payload.customStyle,
+            creation_mode=payload.creationMode,
             references=[
                 PlanningReferenceRequest(item.referenceId, item.version)
                 for item in payload.references
