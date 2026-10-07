@@ -42,7 +42,9 @@ class Settings(BaseSettings):
     image_generation_base_url: str | None = None
     image_generation_api_key: str | None = Field(default=None, repr=False)
     image_generation_model: str = "gpt-image-2"
-    image_generation_timeout_ms: int = 600000
+    # Image gateways may poll asynchronous upstream jobs for longer than ten minutes.
+    # Keep the client deadline aligned with the gateway's configured task timeout.
+    image_generation_timeout_ms: int = 1_800_000
     model_connection_encryption_key: str | None = Field(default=None, repr=False)
     generation_worker_poll_interval_ms: int = Field(default=1_000, ge=100)
     generation_worker_lease_seconds: int = Field(default=60, ge=1)

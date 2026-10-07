@@ -11,6 +11,7 @@ from ..core.errors import AppError
 from .design_knowledge import design_knowledge_context, load_design_knowledge
 from .image_style_library import style_library_context
 from .commerce_design import commerce_design_context
+from .product_appearance import product_appearance_contract_prompt
 from .task_design import resolve_task_design
 
 
@@ -19,7 +20,7 @@ V2_RENDERER_VERSION = "module-renderer-v2.1"
 V2_COMPOSER_VERSION = "final-composer-v2.1"
 
 
-SYSTEM_PROMPT_BASE = (
+_SYSTEM_PROMPT_BASE = (
     "你是电商图片模块规划器。你要直接写出一段可交给图片模型的画面描述提示词。\n\n"
 
     "【任务】\n"
@@ -59,6 +60,11 @@ SYSTEM_PROMPT_BASE = (
     "当出场方式改变时，同步调整旧建议中的商品构图，不得用旧建议撤销用户选择。"
     "compositionAdvice 可以优化，不能因模块名把 none 自动改回完整产品。"
     "若用户明确要求改变出场方式，在 visualDirection 说明调整原因，并核对商品事实及平台约束。"
+    "产品出场必须先做行为决策：在 compositionAdvice 和 taskOutline 的构图建议中明确产品是否出场、"
+    "产品行为或状态、互动对象，以及该行为如何服务本图目标，再决定视角、位置、比例和版式。"
+    "productPresence=context 时必须写具体动作或状态（如佩戴、手持、打开、使用中、食用中、倒出、连接、收纳、拆装或静置），"
+    "不能只写‘放在场景中’；productPresence=none 时不得补画产品或 logo。行为必须符合品类和已确认事实，"
+    "不得用动作暗示未证实的功能、功效或适用人群。下游 imagePrompt 必须执行该构图建议，不得退回成无行为的通用商品摆拍。"
     "placement=primary 是首图、gallery 是附图、detail 是详情图；按规则适用范围执行，"
     "仅限首图的要求不得扩散到附图和详情图；适用于所有图片的规则始终遵守。"
     "出图前在本次响应内自检：主信息是否一眼可见、图形是否解释事实、商品是否需要出场、"
@@ -111,6 +117,9 @@ SYSTEM_PROMPT_BASE = (
     "不要返回 taskPrompt 或任何未声明的字段。"
     "不要编造参数、认证、功效、销量、价格、折扣、材质等级、尺寸、容量、成分、产地与质保。\n"
 )
+
+
+SYSTEM_PROMPT_BASE = _SYSTEM_PROMPT_BASE + "\n" + product_appearance_contract_prompt()
 
 
 _BOUNDED_ITEM = Annotated[

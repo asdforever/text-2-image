@@ -109,11 +109,19 @@ from .module_planning_repository import MemoryModulePlanningRepository, Postgres
 from .application.module_planning_service import ModulePlanningService
 from .routes.module_plans import module_plan_router
 from .routes.reverse_projects import reverse_project_router
+from .routes.reverse_execution import reverse_execution_router
 from .reverse_project_repository import (
     InMemoryReverseProjectRepository,
     PostgresReverseProjectRepository,
 )
 from .application.reverse_project_service import ReverseProjectService
+from .reverse_execution_repository import (
+    InMemoryReverseExecutionRepository,
+    PostgresReverseExecutionRepository,
+)
+from .application.reverse_execution_service import ReverseExecutionService
+from .application.reverse_execution_generation_service import ReverseExecutionGenerationService
+from .application.reverse_execution_parameters import ReverseExecutionParameterPlanner
 
 logger = logging.getLogger("picagent")
 
@@ -167,6 +175,9 @@ def create_app(
     image_editing_service=None,
     reverse_project_repository=None,
     reverse_project_service=None,
+    reverse_execution_repository=None,
+    reverse_execution_service=None,
+    reverse_execution_generation_service=None,
 ) -> FastAPI:
     cfg = settings or get_settings()
     cfg.validate_startup()
@@ -437,6 +448,39 @@ def create_app(
     )
     app.state.reverse_project_repository = resolved_reverse_project_repository
     app.state.reverse_project_service = resolved_reverse_project_service
+    reverse_parameter_planner = ReverseExecutionParameterPlanner(
+        planner=resolved_module_planner,
+        project_asset_service=resolved_project_asset_service,
+        config_service=resolved_generation_config_service,
+        prompt_models=prompt_models,
+    )
+    resolved_reverse_execution_repository = reverse_execution_repository or (
+        PostgresReverseExecutionRepository(session_factory)
+        if session_factory is not None
+        else InMemoryReverseExecutionRepository()
+    )
+    resolved_reverse_execution_service = reverse_execution_service or ReverseExecutionService(
+        resolved_reverse_execution_repository,
+        resolved_identity_provider,
+        resolved_project_repository,
+        resolved_reverse_project_service,
+        parameter_planner=reverse_parameter_planner,
+    )
+    resolved_reverse_execution_generation_service = reverse_execution_generation_service or ReverseExecutionGenerationService(
+        plan_service=resolved_reverse_execution_service,
+        repository=resolved_reverse_execution_repository,
+        project_repository=resolved_project_repository,
+        project_asset_service=resolved_project_asset_service,
+        reverse_project_service=resolved_reverse_project_service,
+        image_editor=resolved_image_editor,
+        project_archive=resolved_project_archive,
+        identity_provider=resolved_identity_provider,
+        provider_model=cfg.image_generation_model,
+        model_connections=model_connections,
+    )
+    app.state.reverse_execution_repository = resolved_reverse_execution_repository
+    app.state.reverse_execution_service = resolved_reverse_execution_service
+    app.state.reverse_execution_generation_service = resolved_reverse_execution_generation_service
     resolved_module_service = module_planning_service or ModulePlanningService(
         resolved_module_repository, resolved_project_repository, resolved_project_asset_storage,
         resolved_generation_config_service, prompt_repo, resolved_identity_provider,
@@ -527,6 +571,7 @@ def create_app(
     app.include_router(suite_plan_router)
     app.include_router(module_plan_router)
     app.include_router(reverse_project_router)
+    app.include_router(reverse_execution_router)
     app.include_router(task_center_router)
     app.include_router(workbench_router)
     app.include_router(canvas_generation_router)

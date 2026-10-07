@@ -7,6 +7,7 @@ import pytest
 from backend.app.application.hero_generation_ports import PromptCompileRequest
 from backend.app.application.suite_planning_service import SuitePlanCompilerRequest
 from backend.app.application.module_planning_v2 import (
+    SYSTEM_PROMPT_BASE,
     ModulePlanningV2Result,
     compose_v2_from_snapshot,
     freeze_v2_module_planning,
@@ -14,6 +15,7 @@ from backend.app.application.module_planning_v2 import (
     render_v2_module_prompt,
     resolve_style_seed,
 )
+from backend.app.application.planning_skills import load_planning_skill
 from backend.app.core.errors import AppError
 from backend.app.generation_config_catalog import DEFAULT_STYLE_CATEGORIES
 from backend.app.providers.openai_compatible import (
@@ -36,6 +38,22 @@ def _result_payload() -> dict:
         "visibleFacts": ["商品为黑色", "可见头梁和左右耳罩"],
         "unconfirmedItems": ["不确认灵敏度参数"],
     }
+
+
+def test_professional_planning_requires_behavioral_product_appearance_decision() -> None:
+    for mode in ("hero", "suite"):
+        skill = load_planning_skill(mode)
+        assert "产品行为" in skill.content
+        assert "互动对象" in skill.content
+        assert "compositionBrief" in skill.content
+        assert "productPresence=context" in skill.content
+
+    assert "产品行为" in SYSTEM_PROMPT_BASE
+    assert "具体动作" in SYSTEM_PROMPT_BASE
+    assert "compositionAdvice" in SYSTEM_PROMPT_BASE
+    assert "模块级产品出场契约" in SYSTEM_PROMPT_BASE
+    assert "suite-craft" in SYSTEM_PROMPT_BASE
+    assert "hero-benefit" in SYSTEM_PROMPT_BASE
 
 
 def test_v2_contract_requires_image_prompt_and_rejects_legacy_fields() -> None:

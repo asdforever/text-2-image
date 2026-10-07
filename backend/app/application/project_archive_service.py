@@ -29,6 +29,16 @@ class ProjectArchiveCoordinator:
             product.id, project.id, asset.id
         )
 
+    async def archive_project_output(self, **payload):
+        """Delegate a generated output archive to the product library service.
+
+        Generation workers receive this coordinator so project lifecycle and
+        output archival share one seam. Keep the output archival contract
+        available on the coordinator as well as on the underlying library
+        service.
+        """
+        return await self.product_library_service.archive_project_output(**payload)
+
     async def unlink_project_asset(
         self, project_id: UUID, project_asset_id: UUID
     ) -> bool:
@@ -40,6 +50,18 @@ class ProjectArchiveCoordinator:
         )
 
     async def archive_project_archive(self, project_id: UUID):
+        product = await self.product_library_service.get_project_product(project_id)
+        if product is None:
+            return None
+        return await self.product_library_service.archive_product(product.id)
+
+    async def delete_project_archive(self, project_id: UUID):
+        """Hide the project archive when its source project is hard-deleted.
+
+        Product archives are retained as archived records so historical links and
+        idempotent cleanup remain safe, while the normal product-library listing
+        no longer exposes a project that no longer exists.
+        """
         product = await self.product_library_service.get_project_product(project_id)
         if product is None:
             return None

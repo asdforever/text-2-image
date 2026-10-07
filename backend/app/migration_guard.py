@@ -11,7 +11,7 @@ class MigrationDriftError(RuntimeError):
     pass
 
 
-EXPECTED_ALEMBIC_HEAD = "c0d1e2f3a4b5"
+EXPECTED_ALEMBIC_HEAD = "20260930_reverse_execution"
 
 
 def revision_checksums(script: ScriptDirectory) -> dict[str, str]:

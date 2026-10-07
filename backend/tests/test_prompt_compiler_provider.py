@@ -69,6 +69,28 @@ async def test_module_planner_unwraps_text_content_envelope() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "content",
+    [
+        "```json\n{\"summary\": \"先建立识别。\", \"modules\": [{\"moduleId\": \"suite-hero\", \"resultCount\": 1, \"moduleParameters\": [], \"compositionBrief\": \"完整展示商品。\", \"reason\": \"建立识别。\"}]}\n```",
+        "<think>需要返回规划 JSON。</think>\n{\"summary\": \"先建立识别。\", \"modules\": [{\"moduleId\": \"suite-hero\", \"resultCount\": 1, \"moduleParameters\": [], \"compositionBrief\": \"完整展示商品。\", \"reason\": \"建立识别。\"}]}",
+    ],
+)
+async def test_module_planner_accepts_json_after_common_text_wrappers(content: str) -> None:
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"choices": [{"message": {"content": content}}]})
+
+    planner = OpenAICompatibleModulePlanner(
+        base_url="https://vision.example.test/v1", api_key="secret",
+        model="vision-model", timeout_ms=1000, transport=httpx.MockTransport(handler),
+    )
+
+    result = await planner.plan_modules(ModuleMasterRequest("系统", "用户", [b"image"], ["image/png"]))
+
+    assert result["modules"][0]["moduleId"] == "suite-hero"
+
+
+@pytest.mark.asyncio
 async def test_prompt_compiler_sends_image_and_returns_structured_result() -> None:
     captured: dict[str, object] = {}
 

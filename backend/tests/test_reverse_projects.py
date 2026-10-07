@@ -1,5 +1,6 @@
 from io import BytesIO
 import asyncio
+import json
 from uuid import UUID, uuid4
 
 import httpx
@@ -27,11 +28,16 @@ class Planner:
         self.result = result
         self.error = error
         self.requests = []
+        self.observations = {}
 
     async def plan_modules(self, request):
         self.requests.append(request)
         if self.error:
             raise self.error
+        context = json.loads(request.user_prompt)
+        if context.get("analysisStage") == "reference_observation":
+            reference_id = context["referenceImageId"]
+            return self.observations.get(reference_id, observation_result(reference_id))
         return self.result
 
 
@@ -63,6 +69,90 @@ def analysis_result(reference_id: str) -> dict:
             }
         ],
     }
+
+
+def observation_result(reference_id: str, direction="按键端朝画面左下，尾部朝右上") -> dict:
+    return {
+        "referenceImageId": reference_id,
+        "sceneLayout": "白底，无道具，主体自然落地",
+        "productPresentation": {
+            "subjectCount": 1,
+            "positionAndScale": "主体居中，宽度约占画面八成",
+            "viewpoint": "低角度俯视，非顶视",
+            "orientation": direction,
+            "visibleSurfaces": "顶面与画面右侧侧壁同时可见",
+            "partAnchors": "前端由按键分缝与滚轮定位，尾部为饱满外壳",
+            "framingAndOcclusion": "主体完整，无前景遮挡",
+            "contactAndShadow": "底面接触支撑面，阴影贴合底缘",
+            "visualEvidence": "按键分缝落在画面左下，滚轮靠前，侧壁清楚可见",
+            "uncertainties": ["无法从单张图精确测量相机俯视角"],
+        },
+        "adaptationNotes": "以当前商品真实部件为准，保留观察到的机位和朝向，不复制参考商品标识",
+    }
+
+
+@pytest.mark.asyncio
+async def test_analysis_isolates_reference_images_and_uses_observed_pose_in_saved_modules():
+    planner = Planner()
+    app = make_app(planner=planner)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        project = (await client.post("/api/reverse-projects", json={"name": "逐张观察"})).json()["data"]
+        for filename, color in [("misleading-top-view.png", "red"), ("misleading-45-degrees.png", "blue")]:
+            project = (await client.post(f"/api/reverse-projects/{project['id']}/references",
+                files={"file": (filename, png_bytes(color), "image/png")})).json()["data"]
+        first, second = [item["id"] for item in project["references"]]
+        planner.result = analysis_result(first)
+        second_module = {**planner.result["modules"][0], "id": "second", "referenceImageId": second}
+        planner.result["modules"].append(second_module)
+        planner.observations = {first: observation_result(first), second: observation_result(second, "前端朝画面左，尾部朝右，长轴水平")}
+        response = await client.post(f"/api/reverse-projects/{project['id']}/analyze", json={"expectedRevision": project["revision"]})
+        analyzed = response.json()["data"]
+        published = (await client.post(f"/api/reverse-projects/{project['id']}/versions", json={"expectedRevision": analyzed["revision"]})).json()["data"]
+        business = (await client.post("/api/projects", json={"name": "当前商品"})).json()["data"]
+        execution = (await client.post(f"/api/projects/{business['id']}/reverse-execution", json={"versionId": published["id"]})).json()["data"]
+        compiled = (await client.post(f"/api/projects/{business['id']}/reverse-execution/compile", json={"expectedRevision": execution["revision"]})).json()["data"]
+
+    assert response.status_code == 200, response.text
+    modules = response.json()["data"]["modules"]
+    assert "按键端朝画面左下，尾部朝右上" in modules[0]["layout"]
+    assert "前端朝画面左，尾部朝右，长轴水平" in modules[1]["layout"]
+    assert "精确测量" in modules[0]["layout"]
+    assert "左侧产品，右侧三层信息" not in modules[0]["layout"]
+    observations = [r for r in planner.requests if json.loads(r.user_prompt).get("analysisStage") == "reference_observation"]
+    assert len(observations) == 2
+    assert {json.loads(r.user_prompt)["referenceImageId"]: r.image_inputs for r in observations} == {
+        first: [png_bytes("red")], second: [png_bytes("blue")],
+    }
+    assert all("misleading" not in r.user_prompt for r in observations)
+    assert all("misleading" not in r.user_prompt for r in planner.requests)
+    assert "按键端朝画面左下，尾部朝右上" in compiled["tasks"][0]["promptDraft"]
+    assert "前端朝画面左，尾部朝右，长轴水平" in compiled["tasks"][1]["promptDraft"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("broken_observation", ["wrong_reference", "missing_camera"])
+async def test_invalid_reference_observation_keeps_existing_analysis(broken_observation):
+    planner = Planner()
+    app = make_app(planner=planner)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        project = (await client.post("/api/reverse-projects", json={"name": "保留草稿"})).json()["data"]
+        project = (await client.post(f"/api/reverse-projects/{project['id']}/references",
+            files={"file": ("a.png", png_bytes("red"), "image/png")})).json()["data"]
+        reference_id = project["references"][0]["id"]
+        project = (await client.patch(f"/api/reverse-projects/{project['id']}", json={"expectedRevision": project["revision"], **editable_document(reference_id)})).json()["data"]
+        planner.result = analysis_result(reference_id)
+        observation = observation_result(reference_id)
+        if broken_observation == "wrong_reference":
+            observation["referenceImageId"] = "another-image"
+        else:
+            del observation["productPresentation"]["viewpoint"]
+        planner.observations[reference_id] = observation
+        response = await client.post(f"/api/reverse-projects/{project['id']}/analyze", json={"expectedRevision": project["revision"]})
+        after = (await client.get(f"/api/reverse-projects/{project['id']}")).json()["data"]
+    assert response.status_code == 502
+    assert after["revision"] == project["revision"]
+    assert after["modules"] == project["modules"]
+    assert after["analysis"]["status"] == "failed"
 
 
 def editable_document(reference_id: str) -> dict:
@@ -280,6 +370,16 @@ async def test_analysis_uses_images_and_failure_preserves_manual_draft() -> None
     assert analyzed.json()["data"]["revision"] == 3
     assert success_planner.requests[0].image_inputs == [png_bytes("green")]
     assert success_planner.requests[0].image_mime_types == ["image/png"]
+    # The downstream image model receives text only for the reference pose.
+    # Require the vision request to resolve pose in image coordinates rather
+    # than infer it from a filename such as "45 degrees".
+    analysis_prompt = success_planner.requests[1].system_prompt
+    assert "画面坐标" in analysis_prompt
+    assert "前端与后端" in analysis_prompt
+    assert "可见面" in analysis_prompt
+    assert "占画比例" in analysis_prompt
+    assert "文件名" in analysis_prompt
+    assert "不要把画面内旋转角当作相机俯视角" in analysis_prompt
 
     failure_planner = Planner(error=AppError("MODULE_PLANNER_FAILED", "模型请求失败", 502))
     failed_app = make_app(planner=failure_planner)
@@ -314,10 +414,9 @@ async def test_inflight_analysis_cannot_overwrite_newer_manual_edits() -> None:
 
     class BlockingPlanner(Planner):
         async def plan_modules(self, request):
-            self.requests.append(request)
             entered.set()
             await released.wait()
-            return self.result
+            return await super().plan_modules(request)
 
     planner = BlockingPlanner()
     app = make_app(planner=planner)

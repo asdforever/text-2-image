@@ -273,18 +273,10 @@ class BatchGenerationWorker:
             finally:
                 timings["provider"] = round(perf_counter() - provider_started, 3)
         except TimeoutError:
-            try:
-                if await self.repository.is_slot_cancel_requested(slot_id, lease_token):
-                    await self.repository.complete_cancelled_slot(slot_id, lease_token)
-                    return False
-                await self.repository.mark_needs_retry(
-                    slot_id, lease_token, "PROVIDER_DISPATCH_UNKNOWN",
-                    "生图请求超时，结果不确定，请检查服务商记录后手动重试",
-                )
-            except AppError:
-                pass
-            return False
+            return await self._mark_provider_outcome_uncertain(slot_id, lease_token)
         except AppError as exc:
+            if exc.code == "IMAGE_PROVIDER_TIMEOUT":
+                return await self._mark_provider_outcome_uncertain(slot_id, lease_token)
             return await self._fail_after_dispatch(slot_id, lease_token, exc.code, exc.message)
         except Exception:
             return await self._fail_after_dispatch(
@@ -358,6 +350,19 @@ class BatchGenerationWorker:
             await self.repository.fail_slot(slot_id, lease_token, code, message)
         except AppError:
             return False
+        return False
+
+    async def _mark_provider_outcome_uncertain(self, slot_id, lease_token) -> bool:
+        try:
+            if await self.repository.is_slot_cancel_requested(slot_id, lease_token):
+                await self.repository.complete_cancelled_slot(slot_id, lease_token)
+                return False
+            await self.repository.mark_needs_retry(
+                slot_id, lease_token, "PROVIDER_DISPATCH_UNKNOWN",
+                "生图请求超时，服务商可能仍在处理中，请先检查服务商记录后再重试",
+            )
+        except AppError:
+            pass
         return False
 
     async def _compensate(self, project_id, asset: Any | None) -> None:

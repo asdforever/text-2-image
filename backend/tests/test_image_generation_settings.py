@@ -35,6 +35,7 @@ def test_settings_default_to_three_adaptive_generation_workers() -> None:
     assert settings.generation_worker_lease_seconds == 60
     assert settings.generation_worker_concurrency == 3
     assert settings.generation_worker_claim_limit == 4
+    assert settings.image_generation_timeout_ms == 1_800_000
 
 
 def test_settings_read_generation_worker_limits_from_environment(

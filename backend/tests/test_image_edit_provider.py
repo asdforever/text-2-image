@@ -111,6 +111,44 @@ async def test_image_editor_posts_ordered_multiple_source_files() -> None:
     assert second in captured["body"]
 
 
+@pytest.mark.asyncio
+async def test_image_editor_accepts_data_uri_in_provider_base64_response() -> None:
+    generated = _png_bytes((6, 8), (100, 120, 140))
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={"data": [{"b64_json": f"data:image/png;base64,{_b64(generated)}"}]},
+        )
+
+    editor = _editor(httpx.MockTransport(handler))
+
+    result = await editor.edit(_edit_request())
+
+    assert result.image_bytes == generated
+    assert result.image_mime_type == "image/png"
+
+
+@pytest.mark.asyncio
+async def test_image_editor_downloads_url_in_provider_response() -> None:
+    generated = _png_bytes((6, 8), (100, 120, 140))
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            return httpx.Response(200, content=generated)
+        return httpx.Response(
+            200,
+            json={"data": [{"url": "https://image.example.test/generated.png"}]},
+        )
+
+    editor = _editor(httpx.MockTransport(handler))
+
+    result = await editor.edit(_edit_request())
+
+    assert result.image_bytes == generated
+    assert result.image_mime_type == "image/png"
+
+
 @pytest.mark.parametrize(
     ("ratio", "resolution", "expected_size"),
     [
@@ -177,6 +215,20 @@ async def test_image_editor_normalizes_timeout_and_http_body_without_secrets() -
     assert failed.value.message == "image provider request failed"
     assert "image-secret" not in repr(timeout.value)
     assert "image-secret" not in repr(failed.value)
+
+
+@pytest.mark.asyncio
+async def test_image_editor_maps_gateway_task_timeout_to_provider_timeout() -> None:
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(504, json={"error": {"code": "task_timeout"}})
+
+    editor = _editor(httpx.MockTransport(handler))
+
+    with pytest.raises(AppError) as raised:
+        await editor.edit(_edit_request())
+
+    assert raised.value.code == "IMAGE_PROVIDER_TIMEOUT"
+    assert raised.value.status_code == 504
 
 
 def _editor(transport: httpx.AsyncBaseTransport) -> OpenAICompatibleImageEditor:

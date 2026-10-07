@@ -85,6 +85,27 @@ async def test_regular_slot_retry_reuses_frozen_recipe_and_prompt():
 from backend.app.core.errors import AppError
 
 @pytest.mark.asyncio
+async def test_regular_planner_reports_invalid_fields_and_persists_safe_diagnostics():
+    f = await fixture()
+    f.master.result = {
+        "summary": "商品说明", "warnings": [],
+        "modules": [{"taskId": "a", "moduleId": "suite-hero", "reason": "解释材质",
+                     "suggestedCopy": "纯棉", "moduleParameters": []}],
+    }
+    request = f.input.model_copy(update={
+        "creationMode": "regular", "selectedModules": [{"taskId": "a", "moduleId": "suite-hero"}],
+    })
+    with pytest.raises(AppError) as error:
+        await f.master_service.plan(f.project_id, request, "invalid-regular-fields")
+    assert error.value.code == "MODULE_PLANNER_INVALID_RESPONSE"
+    saved = await f.master_service.latest(f.project_id, "suite")
+    assert saved["status"] == "failed"
+    assert saved["error"]["code"] == "MODULE_PLANNER_INVALID_RESPONSE"
+    assert saved["snapshot"]["validationErrors"] == [
+        {"field": "modules.0.taskTitle", "type": "missing"},
+    ]
+
+@pytest.mark.asyncio
 async def test_regular_edited_parameters_change_prompt_and_cannot_reuse_compile_key():
     f = await hero_fixture()
     original = _input(f.source_asset_id)

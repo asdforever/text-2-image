@@ -242,6 +242,8 @@ class ModulePlanningService:
                                  "generationConfig":{"version":published.version_no,"contentSha256":published.content_sha256},
                                  "systemPrompt":system,"userPrompt":user,
                                  "promptModelConnection":bound.snapshot if bound else None}
+            if callable(getattr(planner, "engine_snapshot", None)):
+                value["snapshot"]["planningEngine"] = planner.engine_snapshot()
             await self.repository.save(self.workspace, project, UUID(value["id"]), value)
             raw = await planner.plan_modules(ModuleMasterRequest(system, user, images, mimes))
             return self._regular_result(payload, catalog, value, raw)
@@ -288,6 +290,8 @@ class ModulePlanningService:
                                  styleLibrary=library,
                                  systemPrompt=system, userPrompt=user,
                                  **({"reversePlanning": reverse_context} if reverse_context else {}))
+        if callable(getattr(planner, "engine_snapshot", None)):
+            value["snapshot"]["planningEngine"] = planner.engine_snapshot()
         # Freeze every actual request before calling the model, including correction.
         value["snapshot"]["modelAttempts"] = []
         for attempt in range(2):
@@ -317,7 +321,18 @@ class ModulePlanningService:
 
     @staticmethod
     def _regular_result(payload, catalog, value, raw=None):
-        result = RegularOutput.model_validate(raw).model_dump()
+        try:
+            result = RegularOutput.model_validate(raw).model_dump()
+        except ValidationError as exc:
+            failures = [
+                {"field": ".".join(str(part) for part in error["loc"]), "type": error["type"]}
+                for error in exc.errors(include_input=False, include_context=False, include_url=False)
+            ]
+            value["snapshot"]["validationErrors"] = failures
+            raise AppError(
+                "MODULE_PLANNER_INVALID_RESPONSE",
+                "内容规划返回字段不完整或格式无效，请重新编译", 502,
+            ) from None
         modules = result["modules"]
         allowed = {item["id"] for item in catalog}
         identities = [(m["taskId"], m["moduleId"]) for m in modules]

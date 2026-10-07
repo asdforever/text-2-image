@@ -46,6 +46,12 @@ class FailingEditor(SuccessEditor):
         raise AppError("IMAGE_PROVIDER_FAILED", "图片 Provider 请求失败", 502)
 
 
+class TimeoutEditor(SuccessEditor):
+    async def edit(self, request):
+        self.requests.append(request)
+        raise AppError("IMAGE_PROVIDER_TIMEOUT", "image provider timed out", 504)
+
+
 class ConcurrentEditor(SuccessEditor):
     def __init__(self) -> None:
         super().__init__()
@@ -212,6 +218,35 @@ async def test_worker_marks_only_the_failing_slot_and_keeps_other_slots_queued()
     assert detail is not None
     assert detail.progress.failed == 1
     assert detail.progress.queued == 2
+
+
+@pytest.mark.asyncio
+async def test_worker_keeps_gateway_timeout_as_uncertain_for_manual_reconciliation() -> None:
+    fixture = await _fixture()
+    request = _input(fixture.source_asset_id)
+    request = type(request)(**{**request.__dict__, "modules": [request.modules[0]]})
+    batch = await fixture.service.compile_prompt_batch(fixture.project_id, request, "timeout-uncertain")
+    confirmation = BatchGenerationConfirmationService(
+        fixture.repository, fixture.service.identity_provider
+    )
+    await confirmation.confirm_batch(fixture.project_id, batch.id, await _compiled_prompts(fixture, batch), "confirm-timeout-uncertain")
+    worker = BatchGenerationWorker(
+        repository=fixture.repository,
+        project_repository=fixture.projects,
+        project_storage=fixture.storage,
+        project_asset_service=ProjectAssetService(fixture.projects, fixture.storage, fixture.service.identity_provider),
+        image_editor=TimeoutEditor(),
+        worker_id="test-worker",
+    )
+
+    completed = await worker.run_once(limit=1)
+    detail = await fixture.repository.get_batch_detail(batch.id, fixture.workspace_id)
+
+    assert completed == 0
+    assert detail is not None
+    assert detail.progress.needs_retry == 1
+    assert detail.progress.failed == 0
+    assert detail.slots[0].error_code == "PROVIDER_DISPATCH_UNKNOWN"
 
 
 @pytest.mark.asyncio

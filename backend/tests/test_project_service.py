@@ -143,3 +143,35 @@ def test_project_archive_also_archives_its_product_entry() -> None:
         assert await product_library.get_project_product(project.id) is None
 
     asyncio.run(run())
+
+
+def test_project_delete_removes_project_from_visible_product_library() -> None:
+    async def run() -> None:
+        workspace_id = UUID(int=33)
+        identity = LocalSingleUserIdentityProvider(
+            IdentityContext(UUID(int=1), workspace_id, "owner")
+        )
+        repository = InMemoryProjectRepository()
+        product_library = ProductLibraryService(identity)
+        coordinator = ProjectArchiveCoordinator(product_library)
+        service = ProjectService(
+            repository,
+            identity,
+            MemoryIdempotencyStore(),
+            project_archive=coordinator,
+        )
+
+        project = await service.create_project("应从成品库移除的项目")
+        library = next(iter(await product_library.list_libraries()))
+        assert len(await product_library.list_products(library.id)) == 1
+
+        assert await service.delete_project(project.id) is True
+
+        assert await product_library.list_products(library.id) == []
+        archived_product = await product_library.get_project_product(
+            project.id, include_archived=True
+        )
+        assert archived_product is not None
+        assert archived_product.archived_at is not None
+
+    asyncio.run(run())

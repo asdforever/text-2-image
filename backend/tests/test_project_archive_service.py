@@ -54,6 +54,19 @@ def test_memory_project_archive_coordinator_is_idempotent_across_lifecycle() -> 
 
 
 @pytest.mark.asyncio
+async def test_project_archive_coordinator_delegates_output_archive() -> None:
+    class ArchiveRecorder:
+        async def archive_project_output(self, **payload):
+            return payload
+
+    coordinator = ProjectArchiveCoordinator(ArchiveRecorder())
+
+    result = await coordinator.archive_project_output(project_id=UUID(int=1), product_type="detail")
+
+    assert result == {"project_id": UUID(int=1), "product_type": "detail"}
+
+
+@pytest.mark.asyncio
 async def test_sql_project_archive_coordinator_reuses_project_product() -> None:
     settings = get_settings()
     if not settings.database_url:

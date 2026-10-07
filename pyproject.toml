@@ -17,6 +17,8 @@ dependencies = [
   # httpx 是运行时依赖：app/providers/openai_compatible.py 会 import 它。
   # Dockerfile 只装 project.dependencies，别把它挪回 dev extras。
   "httpx>=0.27,<1.0",
+  "langchain~=1.4.3",
+  "langchain-openai~=1.6.7",
 ]
 
 [project.optional-dependencies]

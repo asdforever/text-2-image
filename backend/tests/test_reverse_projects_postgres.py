@@ -44,7 +44,7 @@ def test_reverse_projects_revision_is_the_current_migration_head() -> None:
     from backend.app.migration_guard import EXPECTED_ALEMBIC_HEAD
 
     script = ScriptDirectory.from_config(Config(ROOT / "alembic.ini"))
-    assert EXPECTED_ALEMBIC_HEAD == "c0d1e2f3a4b5"
+    assert EXPECTED_ALEMBIC_HEAD == "20260930_reverse_execution"
     assert script.get_heads() == [EXPECTED_ALEMBIC_HEAD]
 
 

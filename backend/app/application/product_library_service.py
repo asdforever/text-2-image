@@ -323,7 +323,7 @@ class SqlAlchemyProductLibraryService:
     async def list_products(self, library_id: UUID, include_archived=False):
         clause = "" if include_archived else " AND archived_at IS NULL"
         async with self.sessions() as session:
-            rows = await session.execute(text("SELECT id, library_id, workspace_id, name, project_id, archived_at FROM project_workbench.products WHERE library_id=:library AND workspace_id=:workspace" + clause + " ORDER BY created_at"), {"library": library_id, "workspace": self._workspace()})
+            rows = await session.execute(text("SELECT products.id, products.library_id, products.workspace_id, products.name, products.project_id, products.archived_at FROM project_workbench.products AS products JOIN project_workbench.product_libraries AS libraries ON libraries.id=products.library_id WHERE products.library_id=:library AND products.workspace_id=:workspace AND (libraries.name <> '项目成品库' OR products.project_id IS NOT NULL)" + clause.replace("archived_at", "products.archived_at") + " ORDER BY products.created_at"), {"library": library_id, "workspace": self._workspace()})
             product_rows = list(rows.mappings())
         return await self._products(product_rows)
 
@@ -332,8 +332,12 @@ class SqlAlchemyProductLibraryService:
         async with self.sessions() as session:
             value = await session.scalar(
                 text(
-                    "SELECT count(*) FROM project_workbench.products "
-                    "WHERE library_id=:library AND workspace_id=:workspace" + clause
+                    "SELECT count(*) FROM project_workbench.products AS products "
+                    "JOIN project_workbench.product_libraries AS libraries "
+                    "ON libraries.id=products.library_id "
+                    "WHERE products.library_id=:library AND products.workspace_id=:workspace "
+                    "AND (libraries.name <> '项目成品库' OR products.project_id IS NOT NULL)"
+                    + clause.replace("archived_at", "products.archived_at")
                 ),
                 {"library": library_id, "workspace": self._workspace()},
             )

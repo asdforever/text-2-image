@@ -51,7 +51,11 @@
 | `IMAGE_GENERATION_BASE_URL` | OpenAI 兼容图片服务地址 |
 | `IMAGE_GENERATION_API_KEY` | 图片生成服务密钥 |
 | `IMAGE_GENERATION_MODEL` | 图片编辑模型名，默认 `gpt-image-2` |
-| `IMAGE_GENERATION_TIMEOUT_MS` | 图片请求超时，默认 `600000` |
+| `IMAGE_GENERATION_TIMEOUT_MS` | 图片请求超时，默认 `1800000`；应与图片网关的任务轮询超时保持一致 |
+
+如果图片服务使用 New API 的 `openai_image` 异步上游，还需要在图片网关运行环境设置
+`TASK_PLUGIN_PROTOCOL_TIMEOUT_SECONDS`（建议至少 `1800`）。网关默认等待 600 秒后会返回超时，
+但上游任务仍可能继续；图片协议不提供通用的结果回收句柄，因此仅延长本地客户端超时无法取回已经超时的图片。
 
 同时必须配置阶段 1 所需的 PostgreSQL 和 MinIO/S3 连接，并确保数据库已前向迁移到当前 Alembic head、生成配置已有可用的已发布版本。浏览器通过 `VITE_FASTAPI_PROXY_TARGET` 访问 FastAPI，默认是 `http://127.0.0.1:8000`。
 

@@ -6,6 +6,7 @@ Changes: removed example product facts; parameterized task, platform, style and 
 import json
 
 from ..core.errors import AppError
+from .product_appearance import product_appearance_contract
 
 
 RECIPE = {
@@ -17,19 +18,30 @@ RECIPE = {
 }
 
 _REGULAR_SUITE_CONSISTENCY = (
-    "同一商品套图：每张图都必须保持同一商品的真实形状、比例、材质、颜色、纹理和可见标识一致；"
+    "同一商品套图：产品出场时必须保持同一商品的真实形状、比例、材质、颜色、纹理和可见标识一致；"
+    "某张图不需要产品时，不强行加入产品；"
+    "同一套图完整静置产品图最多一张，后续优先改用局部、行为化、比例关系或无产品表达；"
     "共享所选风格的色彩关系、品牌气质与光感；不要复制同一背景、同一机位、同一主体摆位，"
     "连续图片必须在场景、镜头距离、视角或版式上产生明显变化；禁止把风格种子中的背景描述当成每张图的固定模板。"
 )
 
+_REGULAR_PRODUCT_APPEARANCE_GUIDANCE = (
+    "每张常规版图片生成前，先判断产品是否需要出场；如果需要，明确具体行为或状态，"
+    "例如静置、佩戴、手持、打开、使用中、食用中、倒出、连接、收纳或拆装，并明确它与人物、手部、环境或其他产品的互动关系，"
+    "再决定视角、位置、占比和版式；如果不需要，不要为了展示产品而强行加入。"
+    "不能只写‘放在场景中’，行为必须符合商品品类和已提供事实，不能暗示未经确认的功能或功效；"
+    "同一套图要避免重复相同的产品行为、姿势和出场方式。"
+    "模块方向中的产品出场契约优先于一般构图偏好；契约要求不出现时，最终提示词不得补回产品。"
+)
+
 _REGULAR_MODULE_DIRECTIONS = {
-    "suite-hero": "主视觉：完整展示商品，使用三分之四主视角，主体清晰占据画面核心并留出文案安全区；背景简洁，建立商品第一印象。",
-    "suite-benefit": "卖点信息图：商品缩小到一侧或画面下方，用结构化信息卡、线条或局部示意表达当前卖点；避免再次做满幅商品特写。",
+    "suite-hero": "主视觉：先根据当前目标判断产品是否需要出场；需要识别时完整展示，强调使用关系时可通过行为化出场，不默认静置三分之四商品照；背景简洁，建立清晰第一印象。",
+    "suite-benefit": "卖点信息图：先判断卖点是否需要产品作为证据，可用完整、局部、行为化出场或不出场；再用结构化信息卡、线条或局部示意表达当前卖点，避免默认满幅商品特写。",
     "suite-detail": "局部微距：以材质、纹理、按键、接口或工艺为焦点，使用近距离特写和浅景深；不要重复完整商品主视图。",
-    "suite-scene": "真实桌面使用场景：将商品放在真实桌面或工作环境，允许出现手部或相关使用动作；使用不同于主视觉的环境光和机位，避免纯科技棚拍背景。",
+    "suite-scene": "真实使用场景：优先判断是否存在具体的佩戴、手持、打开、操作、食用或连接行为；可在真实桌面或其它真实环境中让产品完整、局部或作为场景参与者出场，也可在不需要时不出场；避免无行为的静物摆拍。",
     "suite-size": "尺寸示意：使用中性浅色或干净技术背景，采用正交、侧视或俯视角度和清晰尺寸标注；商品完整可辨，不加入未经提供的参数。",
-    "suite-spec": "参数表：使用规整的产品参数表或信息卡布局，商品约占画面三分之一并留出清晰文字区域；文字只使用已提供的商品事实。",
-    "suite-mood": "生活方式氛围：选择与商品匹配的生活场景或桌面氛围，变化背景材质、景别和机位；保持商品是主角，不复制主视觉的几何科技棚。",
+    "suite-spec": "参数表：先判断产品是否是理解参数所必需的证据；可以缩小、局部展示或不出场，再使用规整的参数表或信息卡布局；文字只使用已提供的商品事实。",
+    "suite-mood": "生活方式氛围：选择与商品匹配的生活场景或桌面氛围，产品是否出场由当前目标决定；可以让人物、食材、材质或环境承担主视觉，变化背景材质、景别和机位，不复制主视觉的几何科技棚。",
     "suite-angle": "多角度展示：使用正面、侧面、背面或俯视等明确角度之一，强调视角差异并保持商品结构、比例和细节一致。",
 }
 
@@ -38,11 +50,16 @@ def regular_suite_consistency() -> str:
     return _REGULAR_SUITE_CONSISTENCY
 
 
+def regular_product_appearance_guidance() -> str:
+    return _REGULAR_PRODUCT_APPEARANCE_GUIDANCE
+
+
 def regular_module_direction(module_id: str) -> str:
-    return _REGULAR_MODULE_DIRECTIONS.get(
+    direction = _REGULAR_MODULE_DIRECTIONS.get(
         module_id,
         "模块专属场景：根据当前模块目标设计独立的场景、机位和版式，与其它模块拉开差异；不要复制其它图片的背景和主体摆位。",
     )
+    return f"{direction} 产品出场契约：{product_appearance_contract(module_id)}"
 
 
 def regular_snapshot(request, selected, master, module, parameters, market, style, constraints):
@@ -71,8 +88,32 @@ def regular_snapshot(request, selected, master, module, parameters, market, styl
     module_direction = regular_module_direction(selected.module_id)
     module_variation = (
         f"本图围绕当前目标“{task['goal']}”选择与其它同类图片不同的局部区域、机位或信息排布；"
-        "如果套图中出现多个同类型模块，也不要复用同一主体摆位。"
+        "优先改变产品行为、出场方式或互动关系，其次再改变机位和版式；如果套图中出现多个同类型模块，也不要复用同一主体摆位。"
     )
+    planned_modules = (master or {}).get("modules", [])
+    if planned_modules:
+        suite_modules = [
+            {
+                "taskId": m.get("taskId") or m.get("moduleId"),
+                "moduleId": m.get("moduleId", ""),
+                "taskTitle": m.get("taskTitle", ""),
+                "goal": m.get("reason", ""),
+                "copy": m.get("suggestedCopy", ""),
+            }
+            for m in planned_modules
+            if isinstance(m, dict)
+        ]
+    else:
+        suite_modules = []
+        for item in getattr(request, "modules", []):
+            item_task = getattr(item, "regular_task", None) or {}
+            suite_modules.append({
+                "taskId": getattr(item, "task_id", None) or getattr(item, "module_id", ""),
+                "moduleId": getattr(item, "module_id", ""),
+                "taskTitle": getattr(item, "module_id", ""),
+                "goal": item_task.get("goal", ""),
+                "copy": item_task.get("copy", ""),
+            })
     context = {
         "goal": task["goal"],
         "approvedCopy": task["copy"],
@@ -82,6 +123,8 @@ def regular_snapshot(request, selected, master, module, parameters, market, styl
         "style": constraints.style.content,
         "customStyle": request.custom_style,
         "suiteConsistency": suite_consistency,
+        "productAppearanceGuidance": regular_product_appearance_guidance(),
+        "suiteModules": suite_modules,
         "moduleDirection": module_direction,
         "moduleVariation": module_variation,
         "styleApplication": "将风格种子作为配色、品牌气质和光感参考；优先执行当前模块的场景与构图方向，不复制风格种子中的固定背景。",
@@ -98,11 +141,14 @@ def regular_snapshot(request, selected, master, module, parameters, market, styl
         "userNotes": getattr(request, "user_notes", ""),
     }
     prompt = (
-        "Create one ecommerce image for the supplied product. Preserve its actual shape, materials, colors and markings. "
+        "Create one ecommerce image for the supplied product. If the product appears, preserve its actual shape, materials, colors and markings. "
         "Use only supplied facts; do not invent claims, prices, certifications or extra text. "
         "Render approvedCopy in the requested language, respecting platform restrictions. No collage. "
         "This is one image in a coherent product suite: obey suiteConsistency, then obey the moduleDirection and moduleVariation for this image. "
-        "The module direction controls the scene, camera and layout; the style seed does not force a repeated background.\n"
+        "The module direction controls the scene, camera and layout; the style seed does not force a repeated background. "
+        "Before composing the image, follow productAppearanceGuidance to decide whether the product appears and what behavior or state it has; "
+        "use suiteModules to make this image complementary to the other planned modules; the behavior decision must guide the composition instead of defaulting to a repeated static product pose. "
+        "A module may intentionally omit the product when the scene, material, action or atmosphere communicates the goal better.\n"
         + json.dumps(context, ensure_ascii=False)
     )
     return {
@@ -117,6 +163,8 @@ def regular_snapshot(request, selected, master, module, parameters, market, styl
         "compiledTaskPrompt": prompt,
         "recipe": dict(RECIPE),
         "suiteConsistency": suite_consistency,
+        "productAppearanceGuidance": regular_product_appearance_guidance(),
+        "suiteModules": suite_modules,
         "moduleDirection": module_direction,
         "moduleVariation": module_variation,
         "selection": {

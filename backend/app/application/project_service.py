@@ -65,6 +65,10 @@ class ProjectService:
         if self.project_archive is not None:
             await self.project_archive.archive_project_archive(project_id)
 
+    async def _delete_project_archive(self, project_id: UUID) -> None:
+        if self.project_archive is not None:
+            await self.project_archive.delete_project_archive(project_id)
+
     async def list_projects(self, *, include_archived: bool = False) -> list[ProjectRecord]:
         context = self.identity_provider.get_context()
         return await self.repository.list_projects(
@@ -120,7 +124,9 @@ class ProjectService:
     ) -> bool:
         context = self.identity_provider.get_context()
         if not idempotency_key:
-            return await self.repository.delete_project(project_id, context.workspace_id)
+            await self._delete_project_archive(project_id)
+            deleted = await self.repository.delete_project(project_id, context.workspace_id)
+            return deleted
         scope = f"{context.workspace_id}:DELETE:/api/projects/{project_id}"
         fingerprint = request_fingerprint({"projectId": str(project_id), "action": "delete"})
         claim = await self.idempotency_store.claim(scope, idempotency_key, fingerprint)
@@ -128,6 +134,7 @@ class ProjectService:
             self._ensure_replayable(claim)
             return bool((claim.record.response_body or {}).get("deleted"))
         try:
+            await self._delete_project_archive(project_id)
             deleted = await self.repository.delete_project(project_id, context.workspace_id)
             await self.idempotency_store.complete(
                 scope,

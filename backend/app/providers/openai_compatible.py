@@ -2,10 +2,12 @@ import base64
 import binascii
 from copy import copy
 import json
+import re
 from typing import Any
 from urllib.parse import urlsplit
 
 import httpx
+from openai import APIConnectionError, APIResponseValidationError, APIStatusError, APITimeoutError
 
 from ..application.hero_generation_ports import (
     ImageEditRequest,
@@ -17,6 +19,7 @@ from ..application.module_planning_v2 import parse_v2_result
 from ..core.errors import AppError
 from ..core.image_dimensions import normalize_resolution
 from ..image_processing import inspect_image
+from .planning_agent import planning_engine_snapshot, run_planning_agent
 
 
 _IMAGE_SIZE_MAP = {
@@ -211,7 +214,7 @@ class OpenAICompatibleSuitePlannerCompiler(OpenAIChatProvider):
         return _parse_v2_compile_response(response, "PLANNING_COMPILER_INVALID_RESPONSE")
 
 class OpenAICompatibleModulePlanner(OpenAIChatProvider):
-    """规划大师：返回页面模块分工和构图简案，不生成图片提示词。"""
+    """LangChain 规划大师，保留兼容模型连接与业务输出契约。"""
 
     def __init__(self, *, base_url: str | None, api_key: str | None, model: str | None,
                  timeout_ms: int, transport: httpx.AsyncBaseTransport | None = None):
@@ -223,6 +226,9 @@ class OpenAICompatibleModulePlanner(OpenAIChatProvider):
         bound._base_url, bound._api_key, bound._model = connection.base_url, connection.api_key, connection.model_name
         return bound
 
+    def engine_snapshot(self) -> dict[str, Any]:
+        return planning_engine_snapshot()
+
     async def plan_modules(self, request: ModuleMasterRequest) -> dict[str, Any]:
         if not self._base_url or not self._api_key or not self._model:
             raise AppError("MODULE_PLANNER_UNAVAILABLE", "规划大师服务未配置", 503)
@@ -232,19 +238,21 @@ class OpenAICompatibleModulePlanner(OpenAIChatProvider):
         for data, mime in zip(request.image_inputs, request.image_mime_types):
             content.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"}})
         try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(self._timeout_ms / 1000), transport=self._transport) as client:
-                response = await client.post(chat_endpoint(self._base_url), headers={"Authorization": f"Bearer {self._api_key}"}, json={
-                    "model": self._model, "temperature": 0, "response_format": {"type": "json_object"},
-                    "messages": [{"role": "system", "content": request.system_prompt}, {"role": "user", "content": content}],
-                })
-        except httpx.TimeoutException:
+            result = await run_planning_agent(
+                base_url=chat_endpoint(self._base_url).removesuffix("/chat/completions"),
+                api_key=self._api_key, model=self._model, timeout_ms=self._timeout_ms,
+                system_prompt=request.system_prompt, content=content, transport=self._transport,
+            )
+        except (APITimeoutError, httpx.TimeoutException):
             raise AppError("MODULE_PLANNER_TIMEOUT", "规划大师服务超时", 504) from None
-        except httpx.RequestError:
+        except (APIConnectionError, httpx.RequestError):
             raise AppError("MODULE_PLANNER_FAILED", "规划大师请求失败", 502) from None
-        if response.is_error:
-            raise _chat_provider_error("MODULE_PLANNER", response.status_code)
+        except APIStatusError as exc:
+            raise _chat_provider_error("MODULE_PLANNER", exc.status_code) from None
+        except (APIResponseValidationError, AttributeError, IndexError, KeyError, TypeError, ValueError):
+            raise AppError("MODULE_PLANNER_INVALID_RESPONSE", "规划大师返回格式无效", 502) from None
         try:
-            payload = _decode_json_message_content(response.json()["choices"][0]["message"]["content"])
+            payload = _decode_json_message_content(result)
             if not isinstance(payload, dict):
                 raise TypeError("planner payload must be an object")
             return payload
@@ -259,13 +267,37 @@ def _decode_json_message_content(value: Any) -> Any:
     "content":"<json>"}`` instead of returning the planner object directly.
     The envelope is transport metadata, not the planner schema, so unwrap it once.
     """
-    payload = json.loads(value) if isinstance(value, str) else value
+    if isinstance(value, list):
+        text_parts = [
+            item.get("text")
+            for item in value
+            if isinstance(item, dict)
+            and item.get("type") in {"text", "output_text"}
+            and isinstance(item.get("text"), str)
+        ]
+        if not text_parts:
+            raise TypeError("planner content parts must contain text")
+        value = "\n".join(text_parts)
+
+    if isinstance(value, str):
+        text = value.strip()
+        text = re.sub(r"^<think>.*?</think>\s*", "", text, count=1, flags=re.IGNORECASE | re.DOTALL)
+        fenced = re.fullmatch(r"```(?:json)?\s*(.*?)\s*```", text, flags=re.IGNORECASE | re.DOTALL)
+        if fenced:
+            text = fenced.group(1).strip()
+        payload = json.loads(text)
+    else:
+        payload = value
     if (
         isinstance(payload, dict)
         and isinstance(payload.get("content"), str)
         and payload.get("type") in {"text", "output_text"}
     ):
-        payload = json.loads(payload["content"])
+        payload = _decode_json_message_content(payload["content"])
+    if isinstance(payload, dict) and "summary" in payload and isinstance(payload.get("modules"), list):
+        # Some model responses annotate the complete plan with a root `type`.
+        # It carries no planning data; keep every other field for schema validation.
+        payload = {key: item for key, item in payload.items() if key != "type"}
     return payload
 
 
@@ -354,6 +386,15 @@ class OpenAICompatibleImageEditor:
                     data=data,
                     files=files,
                 )
+                if response.is_error:
+                    if response.status_code == 504:
+                        raise AppError("IMAGE_PROVIDER_TIMEOUT", "image provider timed out", 504)
+                    raise AppError(
+                        "IMAGE_PROVIDER_FAILED",
+                        "image provider request failed",
+                        502,
+                    )
+                image_bytes, image_mime_type = await _parse_image_edit_response(response, client)
         except httpx.TimeoutException:
             raise AppError("IMAGE_PROVIDER_TIMEOUT", "image provider timed out", 504) from None
         except httpx.RequestError:
@@ -363,14 +404,6 @@ class OpenAICompatibleImageEditor:
                 502,
             ) from None
 
-        if response.is_error:
-            raise AppError(
-                "IMAGE_PROVIDER_FAILED",
-                "image provider request failed",
-                502,
-            )
-
-        image_bytes, image_mime_type = _parse_image_edit_response(response)
         return ImageEditResult(
             image_bytes=image_bytes,
             image_mime_type=image_mime_type,
@@ -378,13 +411,36 @@ class OpenAICompatibleImageEditor:
         )
 
 
-def _parse_image_edit_response(response: httpx.Response) -> tuple[bytes, str]:
+async def _parse_image_edit_response(
+    response: httpx.Response,
+    client: httpx.AsyncClient,
+) -> tuple[bytes, str]:
     try:
         payload = response.json()
-        encoded = payload["data"][0]["b64_json"]
-        if not isinstance(encoded, str) or not encoded:
-            raise ValueError("missing base64 image")
-        image_bytes = base64.b64decode(encoded, validate=True)
+        item = payload["data"][0]
+        encoded = item.get("b64_json") if isinstance(item, dict) else None
+        if isinstance(encoded, str) and encoded:
+            # Some OpenAI-compatible gateways wrap the payload in a data URI,
+            # while the Images API contract normally returns raw base64. Accept
+            # both forms and tolerate line wrapping introduced by the gateway.
+            if encoded.startswith("data:"):
+                header, separator, encoded = encoded.partition(",")
+                if not separator or ";base64" not in header.lower():
+                    raise ValueError("invalid data URI image")
+            image_bytes = base64.b64decode(re.sub(r"\s+", "", encoded), validate=True)
+        else:
+            image_url = item.get("url") if isinstance(item, dict) else None
+            parsed_url = urlsplit(image_url) if isinstance(image_url, str) else None
+            if (
+                not parsed_url
+                or parsed_url.scheme not in {"http", "https"}
+                or not parsed_url.netloc
+            ):
+                raise ValueError("missing image payload")
+            image_response = await client.get(image_url)
+            if image_response.is_error or not image_response.content:
+                raise ValueError("image URL download failed")
+            image_bytes = image_response.content
         mime_type, _, _, _ = inspect_image(
             image_bytes,
             None,

@@ -11,6 +11,7 @@ from ..project_storage import inspect_project_image
 from ..reverse_project_repository import ReverseReferenceRecord
 from ..storage import StoredObject
 from .module_planning_service import ModuleMasterRequest
+from .reverse_image_analysis import observe_reference_image, observed_layout
 
 
 class ReverseOverall(BaseModel):
@@ -198,7 +199,6 @@ class ReverseProjectService:
                     {
                         "imageIndex": index,
                         "referenceImageId": str(reference.id),
-                        "filename": reference.filename,
                     }
                 )
             planner = self.planner
@@ -208,11 +208,15 @@ class ReverseProjectService:
                 planner = bound.compiler
             system_prompt = (
                 "你是电商视觉拆解专家。分析整套参考图的内容顺序、视觉系统、模块策略和适配规则。"
+                "本阶段分析整套内容职责、信息层级、文字与光影；每张参考图必须恰好对应一个模块，"
+                "referenceImageId使用对应图像标识，不能漏图或让多个模块重复引用同一张图。"
+                "layout只描述场景构图概览，具体产品机位和朝向由后续逐图观察记录决定，不编造相机角度。"
                 "只总结设计方法，不得把参考商品的参数、价格、功效或认证当作当前商品事实。"
                 "严格返回 outputSchema 对应的 JSON。"
             )
             user_prompt = json.dumps(
                 {
+                    "analysisStage": "overall_strategy",
                     "project": {"name": project.name, "category": project.category},
                     "imageRoles": image_roles,
                     "outputSchema": ReverseAnalysisOutput.model_json_schema(),
@@ -229,6 +233,21 @@ class ReverseProjectService:
                 item["referenceImageId"] not in reference_ids for item in parsed["modules"]
             ):
                 raise AppError("REVERSE_ANALYSIS_INVALID_RESPONSE", "反推分析返回了无效模块引用", 502)
+            module_reference_ids = [item["referenceImageId"] for item in parsed["modules"]]
+            if len(module_reference_ids) != len(reference_ids) or set(module_reference_ids) != reference_ids:
+                raise AppError("REVERSE_ANALYSIS_INVALID_RESPONSE", "反推分析必须逐张对应全部参考图", 502)
+            modules_by_reference = {item["referenceImageId"]: item for item in parsed["modules"]}
+            # Global strategy is separate from geometry. Each observation sees
+            # exactly one image and is the source of truth for that module's pose.
+            ordered_modules = []
+            for reference, image, mime in zip(project.references, images, mimes):
+                observation = await observe_reference_image(planner, str(reference.id), image, mime)
+                module = modules_by_reference[str(reference.id)]
+                module["layout"] = observed_layout(observation)
+                module["adaptationNotes"] = observation.adaptationNotes
+                # The rendered observation must also fit the existing public contract.
+                ordered_modules.append(ReverseModule.model_validate(module).model_dump())
+            parsed["modules"] = ordered_modules
             result = {
                 "category": parsed["category"],
                 "summary": parsed["summary"],
