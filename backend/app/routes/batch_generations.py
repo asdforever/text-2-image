@@ -100,13 +100,15 @@ async def compile_batch(project_id: UUID, payload: BatchHeroPromptCompileInput, 
             output_language=payload.outputLanguage, custom_style=payload.customStyle,
             creation_mode=payload.creationMode, user_notes=payload.userNotes,
             module_plan_id=payload.modulePlanId,
+            planning_applied_version_id=payload.planningAppliedVersionId,
             reverse_version_id=payload.reverseVersionId,
             modules=[BatchHeroModuleInput(item.moduleId, item.resultCount, [
                 parameter.model_dump() for parameter in item.moduleParameters
             ], task_id=item.taskId, task_design=item.taskDesign.model_dump(exclude_none=True) if item.taskDesign else None, reverse_reference=(
                 item.reverseReference.model_dump(mode="python")
                 if item.reverseReference else None
-            ), regular_task=item.regularTask) for item in payload.modules],
+            ), regular_task=item.regularTask,
+            regular_options=item.regularOptions.model_dump() if item.regularOptions is not None else None) for item in payload.modules],
         ),
         idempotency_key or "",
     )

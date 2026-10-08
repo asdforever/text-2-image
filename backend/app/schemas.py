@@ -4,6 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from .application.task_design import TaskDesignInput
+from .application.regular_design import RegularTaskOptions
 
 
 class SuiteCreate(BaseModel):
@@ -69,9 +70,11 @@ class BatchHeroModuleInput(BaseModel):
     moduleParameters: list[HeroModuleParameterInput] = Field(default_factory=list, max_length=20)
     reverseReference: "ReverseModuleReferenceInput | None" = None
     regularTask: dict[str, str] | None = None
+    regularOptions: RegularTaskOptions | None = None
 
 
 class BatchHeroPromptCompileInput(BaseModel):
+    planningAppliedVersionId: UUID | None = None
     model_config = ConfigDict(extra="forbid")
 
     sourceAssetId: UUID
@@ -119,9 +122,11 @@ class SuitePlanModuleCompileInput(BaseModel):
     moduleParameters: list[HeroModuleParameterInput] = Field(default_factory=list, max_length=20)
     reverseReference: ReverseModuleReferenceInput | None = None
     regularTask: dict[str, str] | None = None
+    regularOptions: RegularTaskOptions | None = None
 
 
 class SuitePlanCompileInput(BaseModel):
+    planningAppliedVersionId: UUID | None = None
     model_config = ConfigDict(extra="forbid")
 
     sourceAssetIds: list[UUID] = Field(min_length=1, max_length=4)

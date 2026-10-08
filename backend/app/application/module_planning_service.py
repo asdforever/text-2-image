@@ -160,6 +160,10 @@ class ModulePlanningService:
             raise AppError("MODULE_PLAN_NOT_READY", "自动规划尚未完成或类型不匹配", 409)
         if value.get("planningContractVersion") not in {"commerce-design-v1", "regular-design-v1"}:
             raise AppError("MODULE_PLAN_NOT_READY", "请重新规划后生成图片", 409)
+        if value.get("origin") == "planning_conversation":
+            conversation = getattr(self, "conversations", None)
+            if conversation is None or not await conversation.is_applied(self.workspace, project, value):
+                raise AppError("MODULE_PLAN_NOT_APPLIED", "请先应用规划修改", 409)
         return value
 
     async def plan(self, project, payload, key):
@@ -205,15 +209,16 @@ class ModulePlanningService:
             raise error from None
         return await self.repository.save(self.workspace, project, plan_id, value)
 
-    async def _execute(self, project, payload, value):
+    async def _execute(self, project, payload, value, prepare_only=False, workspace_id=None):
+        workspace = workspace_id if workspace_id is not None else self.workspace
         images, mimes, sources, references, roles = [], [], [], [], []
         inputs = [(asset_id, "product", order) for order, asset_id in enumerate(payload.sourceAssetIds, 1)]
         inputs += [(asset_id, "reference", order) for order, asset_id in enumerate(payload.referenceAssetIds, 1)]
         for asset_id, role, order in inputs:
-            asset = await self.projects.get_asset(asset_id, self.workspace)
+            asset = await self.projects.get_asset(asset_id, workspace)
             if asset is None or asset.project_id != project or asset.state != "available":
                 raise AppError("INVALID_SOURCE_ASSET", "素材不属于当前项目或不可用", 400)
-            obj = await self.projects.get_object(asset.object_id, self.workspace)
+            obj = await self.projects.get_object(asset.object_id, workspace)
             stored = await self.storage.get(obj.storage_key) if obj and obj.state == "available" else None
             if stored is None or stored.content_type != obj.media_type:
                 raise AppError("INVALID_SOURCE_ASSET", "素材对象不可用", 400)
@@ -244,7 +249,9 @@ class ModulePlanningService:
                                  "promptModelConnection":bound.snapshot if bound else None}
             if callable(getattr(planner, "engine_snapshot", None)):
                 value["snapshot"]["planningEngine"] = planner.engine_snapshot()
-            await self.repository.save(self.workspace, project, UUID(value["id"]), value)
+            if prepare_only:
+                return planner, ModuleMasterRequest(system, user, images, mimes), catalog
+            await self.repository.save(workspace, project, UUID(value["id"]), value)
             raw = await planner.plan_modules(ModuleMasterRequest(system, user, images, mimes))
             return self._regular_result(payload, catalog, value, raw)
         knowledge = design_knowledge_context(load_design_knowledge())
@@ -292,12 +299,14 @@ class ModulePlanningService:
                                  **({"reversePlanning": reverse_context} if reverse_context else {}))
         if callable(getattr(planner, "engine_snapshot", None)):
             value["snapshot"]["planningEngine"] = planner.engine_snapshot()
+        if prepare_only:
+            return planner, ModuleMasterRequest(system, user, images, mimes), catalog
         # Freeze every actual request before calling the model, including correction.
         value["snapshot"]["modelAttempts"] = []
         for attempt in range(2):
             attempt_snapshot = {"userPrompt": user}
             value["snapshot"]["modelAttempts"].append(attempt_snapshot)
-            await self.repository.save(self.workspace, project, UUID(value["id"]), value)
+            await self.repository.save(workspace, project, UUID(value["id"]), value)
             raw = await planner.plan_modules(ModuleMasterRequest(system, user, images, mimes))
             try:
                 return self._validate_output(raw, payload.mode, catalog, reverse_module_ids)
@@ -334,6 +343,19 @@ class ModulePlanningService:
                 "内容规划返回字段不完整或格式无效，请重新编译", 502,
             ) from None
         modules = result["modules"]
+        ModulePlanningService._validate_regular_selection(payload, catalog, modules)
+        if payload.selectedModules:
+            expected = [(m["taskId"], m["moduleId"]) for m in payload.selectedModules]
+            modules = sorted(modules, key=lambda m: expected.index((m["taskId"], m["moduleId"])))
+        for module in modules:
+            module.update(resultCount=1, designGuideIds=[], compositionBrief="", informationQuestion="",
+                          productPresence="full", styleTemplateId="", bigIdea="", visualMechanism="")
+        return {**result, "modules": modules, "creationMode":"regular", "planningContractVersion":"regular-design-v1",
+                "sharedVisualDirection":"", "visualRhythm":[], "productPresencePlan":[], "layoutFamilies":[]}
+
+    @staticmethod
+    def _validate_regular_selection(payload, catalog, modules):
+        """Shared catalog/identity rules after the caller validates its input schema."""
         allowed = {item["id"] for item in catalog}
         identities = [(m["taskId"], m["moduleId"]) for m in modules]
         if any(module_id not in allowed for _, module_id in identities) or len({task_id for task_id, _ in identities}) != len(identities):
@@ -342,12 +364,6 @@ class ModulePlanningService:
             expected = [(m["taskId"], m["moduleId"]) for m in payload.selectedModules]
             if set(identities) != set(expected):
                 raise AppError("MODULE_PLANNER_INVALID_RESPONSE", "规划未保留所选模块", 502)
-            modules = sorted(modules, key=lambda m: expected.index((m["taskId"], m["moduleId"])))
-        for module in modules:
-            module.update(resultCount=1, designGuideIds=[], compositionBrief="", informationQuestion="",
-                          productPresence="full", styleTemplateId="", bigIdea="", visualMechanism="")
-        return {**result, "modules": modules, "creationMode":"regular", "planningContractVersion":"regular-design-v1",
-                "sharedVisualDirection":"", "visualRhythm":[], "productPresencePlan":[], "layoutFamilies":[]}
 
     @staticmethod
     def _validate_output(raw, mode, catalog, reverse_module_ids: set[str] | None = None):

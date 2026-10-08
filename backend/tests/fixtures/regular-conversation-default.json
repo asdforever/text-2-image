@@ -1,0 +1,69 @@
+{
+  "creationMode": "regular",
+  "plannerVersion": "regular-design-v1",
+  "taskId": "detail",
+  "moduleId": "suite-detail",
+  "module": {
+    "id": "suite-detail",
+    "label": "商品细节图",
+    "description": "展示真实细节"
+  },
+  "title": "商品细节图",
+  "regularTask": {
+    "goal": "展示真实滚轮细节",
+    "copy": "滚轮细节"
+  },
+  "moduleParameters": [
+    {
+      "key": "材质",
+      "value": "塑料"
+    },
+    {
+      "key": "避免出现",
+      "value": "人物"
+    }
+  ],
+  "compiledTaskPrompt": "Create one ecommerce image for the supplied product. If the product appears, preserve its actual shape, materials, colors and markings. Use only supplied facts; do not invent claims, prices, certifications or extra text. Render approvedCopy in the requested language, respecting platform restrictions. No collage. This is one image in a coherent product suite: obey suiteConsistency, then obey the moduleDirection and moduleVariation for this image. The module direction controls the scene, camera and layout; the style seed does not force a repeated background. Before composing the image, follow productAppearanceGuidance to decide whether the product appears and what behavior or state it has; use suiteModules to make this image complementary to the other planned modules; the behavior decision must guide the composition instead of defaulting to a repeated static product pose. A module may intentionally omit the product when the scene, material, action or atmosphere communicates the goal better.\n{\"goal\": \"展示真实滚轮细节\", \"approvedCopy\": \"滚轮细节\", \"assignedProductFacts\": [{\"key\": \"材质\", \"value\": \"塑料\"}, {\"key\": \"避免出现\", \"value\": \"人物\"}], \"platform\": \"淘宝\", \"platformRules\": \"平台规则\", \"style\": \"风格规则\", \"customStyle\": \"\", \"suiteConsistency\": \"同一商品套图：产品出场时必须保持同一商品的真实形状、比例、材质、颜色、纹理和可见标识一致；某张图不需要产品时，不强行加入产品；同一套图完整静置产品图最多一张，后续优先改用局部、行为化、比例关系或无产品表达；共享所选风格的色彩关系、品牌气质与光感；不要复制同一背景、同一机位、同一主体摆位，连续图片必须在场景、镜头距离、视角或版式上产生明显变化；禁止把风格种子中的背景描述当成每张图的固定模板。\", \"productAppearanceGuidance\": \"每张常规版图片生成前，先判断产品是否需要出场；如果需要，明确具体行为或状态，例如静置、佩戴、手持、打开、使用中、食用中、倒出、连接、收纳或拆装，并明确它与人物、手部、环境或其他产品的互动关系，再决定视角、位置、占比和版式；如果不需要，不要为了展示产品而强行加入。不能只写‘放在场景中’，行为必须符合商品品类和已提供事实，不能暗示未经确认的功能或功效；同一套图要避免重复相同的产品行为、姿势和出场方式。模块方向中的产品出场契约优先于一般构图偏好；契约要求不出现时，最终提示词不得补回产品。\", \"suiteModules\": [], \"moduleDirection\": \"局部微距：以材质、纹理、按键、接口或工艺为焦点，使用近距离特写和浅景深；不要重复完整商品主视图。 产品出场契约：必须出现局部细节，使用近距离特写解释材质、纹理或结构；不得再次完整摆拍。\", \"moduleVariation\": \"本图围绕当前目标“展示真实滚轮细节”选择与其它同类图片不同的局部区域、机位或信息排布；优先改变产品行为、出场方式或互动关系，其次再改变机位和版式；如果套图中出现多个同类型模块，也不要复用同一主体摆位。\", \"styleApplication\": \"将风格种子作为配色、品牌气质和光感参考；优先执行当前模块的场景与构图方向，不复制风格种子中的固定背景。\", \"module\": {\"id\": \"suite-detail\", \"label\": \"商品细节图\", \"description\": \"展示真实细节\"}, \"output\": {\"aspectRatio\": \"3:4\", \"resolution\": \"标准 1K\", \"language\": \"中文\"}, \"userNotes\": \"\"}",
+  "recipe": {
+    "source_id": "evolink-product-local-v1",
+    "source": "https://github.com/EvoLinkAI/gpt-image-2.5-for-e-commerce",
+    "revision": "963b1f40bfbe5ff81f0c9684587face6a500bc9a",
+    "license": "CC-BY-4.0",
+    "adaptation": "Single product identity-preserving image with suite-level consistency and module-specific scene direction; no inherited example facts or default counts"
+  },
+  "suiteConsistency": "同一商品套图：产品出场时必须保持同一商品的真实形状、比例、材质、颜色、纹理和可见标识一致；某张图不需要产品时，不强行加入产品；同一套图完整静置产品图最多一张，后续优先改用局部、行为化、比例关系或无产品表达；共享所选风格的色彩关系、品牌气质与光感；不要复制同一背景、同一机位、同一主体摆位，连续图片必须在场景、镜头距离、视角或版式上产生明显变化；禁止把风格种子中的背景描述当成每张图的固定模板。",
+  "productAppearanceGuidance": "每张常规版图片生成前，先判断产品是否需要出场；如果需要，明确具体行为或状态，例如静置、佩戴、手持、打开、使用中、食用中、倒出、连接、收纳或拆装，并明确它与人物、手部、环境或其他产品的互动关系，再决定视角、位置、占比和版式；如果不需要，不要为了展示产品而强行加入。不能只写‘放在场景中’，行为必须符合商品品类和已提供事实，不能暗示未经确认的功能或功效；同一套图要避免重复相同的产品行为、姿势和出场方式。模块方向中的产品出场契约优先于一般构图偏好；契约要求不出现时，最终提示词不得补回产品。",
+  "suiteModules": [],
+  "moduleDirection": "局部微距：以材质、纹理、按键、接口或工艺为焦点，使用近距离特写和浅景深；不要重复完整商品主视图。 产品出场契约：必须出现局部细节，使用近距离特写解释材质、纹理或结构；不得再次完整摆拍。",
+  "moduleVariation": "本图围绕当前目标“展示真实滚轮细节”选择与其它同类图片不同的局部区域、机位或信息排布；优先改变产品行为、出场方式或互动关系，其次再改变机位和版式；如果套图中出现多个同类型模块，也不要复用同一主体摆位。",
+  "selection": {
+    "market": {
+      "label": "淘宝"
+    },
+    "style": {
+      "id": "minimal"
+    },
+    "module": {
+      "id": "suite-detail",
+      "label": "商品细节图",
+      "description": "展示真实细节"
+    },
+    "moduleParameters": [
+      {
+        "key": "材质",
+        "value": "塑料"
+      },
+      {
+        "key": "避免出现",
+        "value": "人物"
+      }
+    ],
+    "aspectRatio": "3:4",
+    "resolution": "标准 1K",
+    "outputLanguage": "中文"
+  },
+  "constraints": {
+    "market": "平台规则",
+    "style": "风格规则"
+  }
+}

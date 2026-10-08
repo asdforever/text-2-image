@@ -251,7 +251,9 @@ async def test_absent_reverse_fields_preserve_batch_fingerprint_shape() -> None:
     for module in historical["modules"]:
         module.pop("task_id", None)
         module.pop("reverse_reference", None)
+        module.pop("regular_options", None)
     historical.pop("reverse_version_id", None)
+    historical.pop("planning_applied_version_id", None)
     assert batch.compile_fingerprint == request_fingerprint(historical)
 
 

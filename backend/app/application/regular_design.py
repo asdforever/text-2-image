@@ -4,9 +4,17 @@ CC BY 4.0 https://creativecommons.org/licenses/by/4.0/ .
 Changes: removed example product facts; parameterized task, platform, style and output.
 """
 import json
+from typing import Literal
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ..core.errors import AppError
 from .product_appearance import product_appearance_contract
+
+
+class RegularTaskOptions(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    copyPolicy: Literal['fixed', 'flexible'] = 'fixed'
+    visualRequirements: str = Field(default='', max_length=2000)
 
 
 RECIPE = {
@@ -140,10 +148,25 @@ def regular_snapshot(request, selected, master, module, parameters, market, styl
         },
         "userNotes": getattr(request, "user_notes", ""),
     }
+    options = getattr(selected, 'regular_options', None)
+    if options is not None:
+        try:
+            options = RegularTaskOptions.model_validate(options).model_dump()
+        except ValidationError:
+            raise AppError('REGULAR_OPTIONS_INVALID', '文案策略或视觉要求无效', 400) from None
+        context.update(options)
+        context['lockedInformation'] = '品牌、商品参数、指定原文及商品事实必须准确；不得新增未经提供的功能、功效、价格或认证。'
+        if options['copyPolicy'] == 'flexible':
+            context['suggestedCopy'] = context.pop('approvedCopy')
+    copy_instruction = (
+        'Compose concise copy based on suggestedCopy and supplied facts in the requested language; preserve lockedInformation and respect platform restrictions. No collage. '
+        if options and options['copyPolicy'] == 'flexible' else
+        'Render approvedCopy in the requested language, respecting platform restrictions. No collage. '
+    )
     prompt = (
         "Create one ecommerce image for the supplied product. If the product appears, preserve its actual shape, materials, colors and markings. "
         "Use only supplied facts; do not invent claims, prices, certifications or extra text. "
-        "Render approvedCopy in the requested language, respecting platform restrictions. No collage. "
+        + copy_instruction +
         "This is one image in a coherent product suite: obey suiteConsistency, then obey the moduleDirection and moduleVariation for this image. "
         "The module direction controls the scene, camera and layout; the style seed does not force a repeated background. "
         "Before composing the image, follow productAppearanceGuidance to decide whether the product appears and what behavior or state it has; "
@@ -159,6 +182,7 @@ def regular_snapshot(request, selected, master, module, parameters, market, styl
         "module": module,
         "title": (outline or {}).get("taskTitle", module.get("label", selected.module_id)),
         "regularTask": task,
+        **({'regularOptions': options} if options is not None else {}),
         "moduleParameters": facts,
         "compiledTaskPrompt": prompt,
         "recipe": dict(RECIPE),

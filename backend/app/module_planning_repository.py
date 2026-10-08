@@ -46,7 +46,7 @@ class MemoryModulePlanningRepository:
         return deepcopy(row["value"])
 
     async def latest(self, workspace, project, mode):
-        rows = [r for r in self.records.values() if (r["workspace"], r["project"], r["value"]["mode"]) == (workspace, project, mode)]
+        rows = [r for r in self.records.values() if (r["workspace"], r["project"], r["value"]["mode"]) == (workspace, project, mode) and r["value"].get("origin") != "planning_conversation"]
         return await self.get(workspace, project, max(rows, key=lambda r: r["value"]["createdAt"])["id"]) if rows else None
 
     async def save(self, workspace, project, plan_id, value):
@@ -100,7 +100,7 @@ class PostgresModulePlanningRepository:
         async with self.sessions() as session:
             plan_id = await session.scalar(text(
                 "SELECT id FROM project_workbench.module_plans WHERE workspace_id=:workspace AND project_id=:project AND mode=:mode "
-                "ORDER BY created_at DESC, id DESC LIMIT 1"), dict(workspace=workspace, project=project, mode=mode))
+                "AND COALESCE(document->>'origin','') != 'planning_conversation' ORDER BY created_at DESC, id DESC LIMIT 1"), dict(workspace=workspace, project=project, mode=mode))
         return await self.get(workspace, project, plan_id) if plan_id else None
 
     async def save(self, workspace, project, plan_id, value):

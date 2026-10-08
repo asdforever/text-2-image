@@ -32,6 +32,7 @@ class SuitePlanModuleInput:
     reverse_reference: dict[str, Any] | None = None
     task_design: dict[str, Any] | None = None
     regular_task: dict[str, str] | None = None
+    regular_options: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,7 @@ class SuitePlanCompilationInput:
     custom_style: str = ""
     references: list[PlanningReferenceRequest] = field(default_factory=list)
     module_plan_id: UUID | None = None
+    planning_applied_version_id: UUID | None = None
     reverse_version_id: UUID | None = None
     creation_mode: Literal["regular", "professional"] = "professional"
 
@@ -114,10 +116,16 @@ class SuitePlanningService:
         idempotency_key: str,
     ):
         workspace_id = self.identity_provider.get_context().workspace_id
+        if request.creation_mode != 'regular' and any(m.regular_options is not None for m in request.modules):
+            raise AppError('REGULAR_OPTIONS_MODE_MISMATCH', '常规选项不能用于专业模式', 400)
         if not idempotency_key.strip():
             raise AppError("INVALID_IDEMPOTENCY_REQUEST", "幂等键不能为空", 400)
         fingerprint_input = asdict(request)
+        if request.planning_applied_version_id is None:
+            fingerprint_input.pop('planning_applied_version_id', None)
         for item in fingerprint_input["modules"]:
+            if item.get('regular_options') is None:
+                item.pop('regular_options', None)
             if item["task_id"] is None:
                 item.pop("task_id")
             if item.get("reverse_reference") is None:
@@ -134,6 +142,12 @@ class SuitePlanningService:
             return replay
 
         self._validate_request(request)
+        if request.planning_applied_version_id:
+            conversations = getattr(self.module_planning, 'conversations', None)
+            if conversations is None:
+                raise AppError('MODULE_PLAN_NOT_APPLIED', '规划版本不可用', 409)
+            await conversations.validate_applied_version(project_id, request.module_plan_id,
+                request.planning_applied_version_id, 'suite')
         master_snapshot = None
         if request.module_plan_id:
             if self.module_planning is None:
@@ -353,6 +367,7 @@ class SuitePlanningService:
         ]
         snapshot = {
             "creationMode":request.creation_mode,
+            **({'planningAppliedVersionId': str(request.planning_applied_version_id)} if request.planning_applied_version_id else {}),
             **({"recipe":dict(RECIPE)} if request.creation_mode == "regular" else {}),
             "runtimeModules": runtime_catalog_snapshot(config),
             "plannerVersion": "regular-design-v1" if request.creation_mode == "regular" else PLANNER_VERSION_V2,

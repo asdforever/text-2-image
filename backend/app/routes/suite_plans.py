@@ -100,11 +100,13 @@ async def compile_suite_plan(
                         if item.reverseReference else None
                     ),
                     regular_task=item.regularTask,
+                    regular_options=item.regularOptions.model_dump() if item.regularOptions is not None else None,
                 )
                 for item in payload.modules
             ],
             user_notes=payload.userNotes,
             module_plan_id=payload.modulePlanId,
+            planning_applied_version_id=payload.planningAppliedVersionId,
             reverse_version_id=payload.reverseVersionId,
             custom_style=payload.customStyle,
             creation_mode=payload.creationMode,

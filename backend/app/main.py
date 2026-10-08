@@ -109,6 +109,9 @@ from .providers.openai_compatible import (
 from .module_planning_repository import MemoryModulePlanningRepository, PostgresModulePlanningRepository
 from .application.module_planning_service import ModulePlanningService
 from .routes.module_plans import module_plan_router
+from .routes.planning_conversations import planning_conversation_router
+from .application.planning_conversation_service import PlanningConversationService
+from .planning_conversation_repository import MemoryPlanningConversationRepository, PostgresPlanningConversationRepository
 from .routes.reverse_projects import reverse_project_router
 from .routes.reverse_execution import reverse_execution_router
 from .reverse_project_repository import (
@@ -494,6 +497,9 @@ def create_app(
     )
     app.state.module_planning_repository = resolved_module_repository
     app.state.module_planning_service = resolved_module_service
+    conversation_repository = PostgresPlanningConversationRepository(session_factory) if session_factory is not None else MemoryPlanningConversationRepository()
+    app.state.planning_conversation_service = PlanningConversationService(conversation_repository, resolved_module_service)
+    resolved_module_service.conversations = app.state.planning_conversation_service
     resolved_module_service.reverse_projects = resolved_reverse_project_service
     resolved_suite_planning_service.module_planning = resolved_module_service
     resolved_suite_planning_service.reverse_projects = resolved_reverse_project_service
@@ -578,6 +584,7 @@ def create_app(
     app.include_router(batch_generation_router)
     app.include_router(suite_plan_router)
     app.include_router(module_plan_router)
+    app.include_router(planning_conversation_router)
     app.include_router(reverse_project_router)
     app.include_router(reverse_execution_router)
     app.include_router(task_center_router)

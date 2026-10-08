@@ -38,13 +38,13 @@ def test_reverse_project_migration_creates_scoped_immutable_storage() -> None:
     assert "CHECK (scope IN ('overall', 'module'))" in source
 
 
-def test_reverse_projects_revision_is_the_current_migration_head() -> None:
+def test_reverse_projects_revision_precedes_the_current_migration_head() -> None:
     from alembic.config import Config
     from alembic.script import ScriptDirectory
     from backend.app.migration_guard import EXPECTED_ALEMBIC_HEAD
 
     script = ScriptDirectory.from_config(Config(ROOT / "alembic.ini"))
-    assert EXPECTED_ALEMBIC_HEAD == "20261007_reverse_analysis_token"
+    assert "20261007_reverse_analysis_token" in {revision.revision for revision in script.iterate_revisions(EXPECTED_ALEMBIC_HEAD, "base")}
     assert script.get_heads() == [EXPECTED_ALEMBIC_HEAD]
 
 
