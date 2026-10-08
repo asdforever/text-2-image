@@ -78,26 +78,30 @@ async def generate_white_background(
     request: Request,
     background_tasks: BackgroundTasks,
 ) -> Any:
-    """基于项目原图生成白底图，并将结果回写到同一项目。"""
-    prompt_body = str(payload.get("promptBody") or "").strip()
-    prompt_template_id = str(payload.get("promptTemplateId") or "").strip()
-    prompt_version_id = str(payload.get("promptVersionId") or "").strip()
-    if not prompt_body or not prompt_template_id or not prompt_version_id:
-        raise AppError("WHITE_BACKGROUND_PROMPT_REQUIRED", "请选择可用的白底图提示词", 400)
-
-    await _require_image_prompt_reference(request, payload)
+    """使用商城专用模板的当前默认版本生成商品素材。"""
+    background = payload.get("background", "white")
+    if not isinstance(background, str) or background not in {"white", "transparent"}:
+        raise AppError("PRODUCT_BACKGROUND_INVALID", "背景只能选择白底或透明", 400)
+    label = "透明图" if background == "transparent" else "白底图"
+    repository = request.app.state.prompt_service.repository
+    template = await repository.get_template_by_code(f"product-{background}")
+    version = await repository.resolve_version(template.id) if template else None
+    if version is None or not version.body.strip():
+        raise AppError("PRODUCT_BACKGROUND_PROMPT_UNAVAILABLE", f"请在提示词商城配置商品{label}生成的默认版本", 400)
+    require_image_prompt(version)
 
     session = await _service(request).create_session(project_id, asset_id)
     task = await _service(request).submit_session(
         session.id,
         prompt_snapshot={
-            "summary": prompt_body,
-            "promptTemplateId": prompt_template_id,
-            "promptVersionId": prompt_version_id,
+            "summary": version.body,
+            "promptTemplateId": str(template.id),
+            "promptVersionId": str(version.id),
         },
         config_snapshot={
             "outputKind": "white_background",
-            "outputFilename": f"{session.source_snapshot['filename']}-白底图.png",
+            "background": background,
+            "outputFilename": f"{session.source_snapshot['filename']}-{label}.png",
             "ratio": "1:1",
             "size": "标准 1K",
         },

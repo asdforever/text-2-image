@@ -1,6 +1,7 @@
 from io import BytesIO
 import asyncio
 import json
+from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import httpx
@@ -76,7 +77,12 @@ def observation_result(reference_id: str, direction="按键端朝画面左下，
         "referenceImageId": reference_id,
         "sceneLayout": "白底，无道具，主体自然落地",
         "productPresentation": {
+            "axisAnchors": {
+                "front": {"label": "按键端" if "左下" in direction else "前端", "x": 0.2, "y": 0.8 if "左下" in direction else 0.5},
+                "rear": {"label": "尾部", "x": 0.8, "y": 0.2 if "左下" in direction else 0.5},
+            },
             "subjectCount": 1,
+            "visibleSideAnchor": {"label": "近景侧壁", "x": .7, "y": .75},
             "positionAndScale": "主体居中，宽度约占画面八成",
             "viewpoint": "低角度俯视，非顶视",
             "orientation": direction,
@@ -94,7 +100,9 @@ def observation_result(reference_id: str, direction="按键端朝画面左下，
 @pytest.mark.asyncio
 async def test_analysis_isolates_reference_images_and_uses_observed_pose_in_saved_modules():
     planner = Planner()
+    vision_planner = Planner()
     app = make_app(planner=planner)
+    app.state.reverse_project_service.image_observer = vision_planner
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
         project = (await client.post("/api/reverse-projects", json={"name": "逐张观察"})).json()["data"]
         for filename, color in [("misleading-top-view.png", "red"), ("misleading-45-degrees.png", "blue")]:
@@ -104,7 +112,7 @@ async def test_analysis_isolates_reference_images_and_uses_observed_pose_in_save
         planner.result = analysis_result(first)
         second_module = {**planner.result["modules"][0], "id": "second", "referenceImageId": second}
         planner.result["modules"].append(second_module)
-        planner.observations = {first: observation_result(first), second: observation_result(second, "前端朝画面左，尾部朝右，长轴水平")}
+        vision_planner.observations = {first: observation_result(first), second: observation_result(second, "前端朝画面左，尾部朝右，长轴水平")}
         response = await client.post(f"/api/reverse-projects/{project['id']}/analyze", json={"expectedRevision": project["revision"]})
         analyzed = response.json()["data"]
         published = (await client.post(f"/api/reverse-projects/{project['id']}/versions", json={"expectedRevision": analyzed["revision"]})).json()["data"]
@@ -114,19 +122,20 @@ async def test_analysis_isolates_reference_images_and_uses_observed_pose_in_save
 
     assert response.status_code == 200, response.text
     modules = response.json()["data"]["modules"]
-    assert "按键端朝画面左下，尾部朝右上" in modules[0]["layout"]
-    assert "前端朝画面左，尾部朝右，长轴水平" in modules[1]["layout"]
+    assert "按键端朝画面左下，尾部朝画面右上" in modules[0]["layout"]
+    assert "前端朝画面左，尾部朝画面右" in modules[1]["layout"]
     assert "精确测量" in modules[0]["layout"]
     assert "左侧产品，右侧三层信息" not in modules[0]["layout"]
-    observations = [r for r in planner.requests if json.loads(r.user_prompt).get("analysisStage") == "reference_observation"]
+    observations = [r for r in vision_planner.requests if json.loads(r.user_prompt).get("analysisStage") == "reference_observation"]
     assert len(observations) == 2
+    assert len(planner.requests) == 1
     assert {json.loads(r.user_prompt)["referenceImageId"]: r.image_inputs for r in observations} == {
         first: [png_bytes("red")], second: [png_bytes("blue")],
     }
     assert all("misleading" not in r.user_prompt for r in observations)
     assert all("misleading" not in r.user_prompt for r in planner.requests)
-    assert "按键端朝画面左下，尾部朝右上" in compiled["tasks"][0]["promptDraft"]
-    assert "前端朝画面左，尾部朝右，长轴水平" in compiled["tasks"][1]["promptDraft"]
+    assert "按键端朝画面左下，尾部朝画面右上" in compiled["tasks"][0]["promptDraft"]
+    assert "前端朝画面左，尾部朝画面右" in compiled["tasks"][1]["promptDraft"]
 
 
 @pytest.mark.asyncio
@@ -153,6 +162,27 @@ async def test_invalid_reference_observation_keeps_existing_analysis(broken_obse
     assert after["revision"] == project["revision"]
     assert after["modules"] == project["modules"]
     assert after["analysis"]["status"] == "failed"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mapping", ["missing", "duplicate"])
+async def test_analysis_rejects_incomplete_reference_coverage_before_observing(mapping):
+    planner = Planner()
+    app = make_app(planner=planner)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        project = (await client.post("/api/reverse-projects", json={"name": "图片对应校验"})).json()["data"]
+        for color in ["red", "blue"]:
+            project = (await client.post(f"/api/reverse-projects/{project['id']}/references",
+                files={"file": ("a.png", png_bytes(color), "image/png")})).json()["data"]
+        planner.result = analysis_result(project["references"][0]["id"])
+        if mapping == "duplicate":
+            planner.result["modules"].append({**planner.result["modules"][0], "id": "duplicate-reference"})
+        response = await client.post(f"/api/reverse-projects/{project['id']}/analyze", json={"expectedRevision": project["revision"]})
+        after = (await client.get(f"/api/reverse-projects/{project['id']}")).json()["data"]
+    assert response.status_code == 502
+    assert after["revision"] == project["revision"]
+    assert after["modules"] == []
+    assert all(json.loads(r.user_prompt).get("analysisStage") != "reference_observation" for r in planner.requests)
 
 
 def editable_document(reference_id: str) -> dict:
@@ -183,6 +213,106 @@ def make_app(*, workspace_id=UUID(int=22), reverse_repository=None, storage=None
         reverse_project_repository=reverse_repository or InMemoryReverseProjectRepository(),
         module_planner=planner,
     )
+
+
+@pytest.mark.asyncio
+async def test_analysis_format_error_identifies_the_stage_and_preserves_references():
+    app = make_app(planner=Planner(error=AppError("MODULE_PLANNER_INVALID_RESPONSE", "规划大师返回格式无效", 502)))
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        project = (await client.post("/api/reverse-projects", json={"name": "格式失败"})).json()["data"]
+        project = (await client.post(f"/api/reverse-projects/{project['id']}/references",
+                    files={"file": ("one.png", png_bytes("green"), "image/png")})).json()["data"]
+        failed = await client.post(f"/api/reverse-projects/{project['id']}/analyze", json={"expectedRevision": project["revision"]})
+        after = (await client.get(f"/api/reverse-projects/{project['id']}")).json()["data"]
+    assert failed.status_code == 502
+    assert "整体策略" in failed.json()["error"]["message"]
+    assert after["analysis"]["status"] == "failed"
+    assert after["analysis"]["error"] == failed.json()["error"]["message"]
+    assert after["references"] == project["references"]
+    assert after["revision"] == project["revision"]
+
+
+@pytest.mark.asyncio
+async def test_interrupted_analysis_releases_running_state_and_can_be_retried():
+    app = make_app(planner=Planner(error=asyncio.CancelledError()))
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        project = (await client.post("/api/reverse-projects", json={"name": "分析中断"})).json()["data"]
+        project = (await client.post(f"/api/reverse-projects/{project['id']}/references",
+                    files={"file": ("one.png", png_bytes("green"), "image/png")})).json()["data"]
+        with pytest.raises(asyncio.CancelledError):
+            await app.state.reverse_project_service.analyze(UUID(project["id"]), project["revision"])
+        after = (await client.get(f"/api/reverse-projects/{project['id']}")).json()["data"]
+        assert after["analysis"]["status"] == "failed"
+        assert after["references"] == project["references"]
+        assert after["revision"] == project["revision"]
+        app.state.reverse_project_service.planner = Planner(result=analysis_result(project["references"][0]["id"]))
+        retried = await client.post(f"/api/reverse-projects/{project['id']}/analyze", json={"expectedRevision": after["revision"]})
+        assert retried.status_code == 200
+        assert retried.json()["data"]["analysis"]["status"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_cancelling_finished_request_does_not_clear_a_new_analysis_claim():
+    committed = asyncio.Event()
+    release = asyncio.Event()
+
+    class DelayedCompletion(InMemoryReverseProjectRepository):
+        async def complete_analysis(self, *args):
+            result = await super().complete_analysis(*args)
+            committed.set()
+            await release.wait()
+            return result
+
+    repository = DelayedCompletion()
+    planner = Planner()
+    app = make_app(reverse_repository=repository, planner=planner)
+    service = app.state.reverse_project_service
+    project = await service.create_project("分析归属")
+    project = await service.add_reference(project.id, "one.png", "image/png", png_bytes("green"))
+    planner.result = analysis_result(str(project.references[0].id))
+    previous = asyncio.create_task(service.analyze(project.id, project.revision))
+    await committed.wait()
+    try:
+        next_claim = await repository.claim_analysis(service.workspace_id, project.id, project.revision + 1)
+        previous.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await previous
+        current = await service.get_project(project.id)
+        assert current.analysis_status == "running"
+        assert current.revision == next_claim.revision
+        assert current.summary == analysis_result(str(project.references[0].id))["summary"]
+    finally:
+        release.set()
+        if not previous.done():
+            previous.cancel()
+            await asyncio.gather(previous, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_all_reverse_stages_use_published_prompt_model_instead_of_environment_observer(monkeypatch):
+    monkeypatch.setenv("CONTEXT_BASE_URL", "https://legacy.example.test")
+    monkeypatch.setenv("CONTEXT_API_KEY", "legacy-test-key")
+    monkeypatch.setenv("CONTEXT_MODEL", "qwen3.8-27b")
+    legacy = Planner(error=AppError("MODULE_PLANNER_FAILED", "旧模型不应该被调用", 502))
+    configured = Planner()
+    app = make_app(planner=legacy)
+
+    class PublishedPromptModels:
+        async def bind(self, content, planner):
+            return SimpleNamespace(compiler=configured)
+
+    app.state.reverse_project_service.prompt_models = PublishedPromptModels()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        project = (await client.post("/api/reverse-projects", json={"name": "统一提示词模型"})).json()["data"]
+        project = (await client.post(f"/api/reverse-projects/{project['id']}/references",
+                    files={"file": ("one.png", png_bytes("green"), "image/png")})).json()["data"]
+        configured.result = analysis_result(project["references"][0]["id"])
+        analyzed = await client.post(f"/api/reverse-projects/{project['id']}/analyze", json={"expectedRevision": project["revision"]})
+    assert analyzed.status_code == 200
+    assert legacy.requests == []
+    assert [json.loads(request.user_prompt)["analysisStage"] for request in configured.requests] == [
+        "overall_strategy", "reference_observation",
+    ]
 
 
 @pytest.mark.asyncio

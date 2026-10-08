@@ -257,6 +257,39 @@ def test_project_asset_service_releases_derived_assets_before_source_assets() ->
     asyncio.run(run())
 
 
+def test_project_cleanup_overlaps_independent_io_with_a_bounded_limit() -> None:
+    class DelayedStorage(MemoryProjectAssetStorage):
+        active = 0
+        peak = 0
+
+        async def delete(self, key: str) -> None:
+            self.active += 1
+            self.peak = max(self.peak, self.active)
+            try:
+                await asyncio.sleep(0.02)
+                await super().delete(key)
+            finally:
+                self.active -= 1
+
+    async def run() -> None:
+        repository = InMemoryProjectRepository()
+        workspace_id = UUID(int=11)
+        project = await repository.create_project("清理性能", workspace_id)
+        storage = DelayedStorage()
+        service = ProjectAssetService(repository, storage, LocalSingleUserIdentityProvider(
+            IdentityContext(UUID(int=1), workspace_id, "owner")
+        ))
+        for index in range(12):
+            await service.upload_asset(project.id, "source", _png(), "image/png", f"{index}.png")
+        await service.delete_project_assets(project.id)
+        assert 1 < storage.peak <= 4
+        assert storage.active == 0
+        assert await repository.list_assets(project.id, workspace_id) == []
+        assert storage.objects == {}
+
+    asyncio.run(run())
+
+
 def test_project_assets_are_linked_to_project_archive_as_they_are_created() -> None:
     async def run() -> None:
         repository = InMemoryProjectRepository()

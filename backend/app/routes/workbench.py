@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Header, Request
 
 from ..application.workbench_service import WorkbenchService
-from ..application.canvas_lineage import canvas_generation_steps, style_harmonization_steps
+from ..application.canvas_lineage import canvas_generation_steps, style_harmonization_steps, reverse_execution_steps
 from ..core.errors import AppError
 from ..application.idempotency import request_fingerprint
 from ..core.http import success_response
@@ -70,6 +70,10 @@ async def get_workbench(suite_id: UUID, request: Request):
     edit_tasks = await editing.repository.list_tasks(suite_id, service._scope())
     assets = await service.project_repository.list_assets(suite_id, service._scope()) if service.project_repository else []
     steps = await canvas_generation_steps(suite_id, service._scope(), assets, service.batch_repository, edit_tasks)
+    # Legacy suite workbenches may predate the product-project domain. The
+    # aggregate above owns validation; the projection query remains scoped.
+    reverse_batches = await request.app.state.reverse_execution_batch_repository.list(service._scope(), suite_id)
+    steps.extend(reverse_execution_steps(reverse_batches, assets))
     # 风格候选有独立任务快照，仅投影生成依据，不加入替换原图的版本轨道。
     if any((asset.source_snapshot or {}).get("styleHarmonizationId") for asset in assets if asset.state == "available"):
         jobs = await request.app.state.style_harmonization_service.list_jobs(suite_id)

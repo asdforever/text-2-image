@@ -1,0 +1,27 @@
+[
+  {
+    "referenceImageId": "2c4b584d-dc0e-4f80-abc5-b4d149d5ea76",
+    "axisAnchors": {
+      "front": {
+        "label": "前端轮廓点",
+        "x": 0.85,
+        "y": 0.56
+      },
+      "rear": {
+        "label": "后端轮廓点",
+        "x": 0.18,
+        "y": 0.45
+      }
+    },
+    "visibleSideAnchor": {
+      "label": "近景侧壁中央",
+      "x": 0.45,
+      "y": 0.55
+    },
+    "viewpoint": "斜上方侧前方机位，顶面与近景侧壁均可见，底缘轮廓清晰，立体厚度明显。",
+    "visibleSurfaces": "顶面、近景侧壁",
+    "partAnchors": "前端主键分缝、滚轮、侧键、线缆",
+    "visualEvidence": "前端两主键分缝与外轮廓交点位于前端轮廓，后端轮廓位于相反尾端，近景侧壁可见，线缆从前端延伸。",
+    "uncertainties": []
+  }
+]

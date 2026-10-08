@@ -145,6 +145,9 @@ class TestExecutor:
             payload["style"] = generation_params["style"]
         if "seed" in generation_params:
             payload["seed"] = generation_params["seed"]
+        if generation_params.get("background") == "transparent":
+            payload["background"] = "transparent"
+            payload["output_format"] = "png"
 
         # Add image for image-to-image workflow (base64 encoded)
         if image_b64:
@@ -171,6 +174,9 @@ class TestExecutor:
             raise ValueError("API 未返回图片数据")
 
         image_bytes = base64.b64decode(b64)
+        if generation_params.get("background") == "transparent":
+            from .core.transparent_image import transparent_png
+            image_bytes = transparent_png(image_bytes)
         return image_bytes, "image/png"
 
     async def _store_result(

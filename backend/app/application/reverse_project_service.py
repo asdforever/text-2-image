@@ -1,3 +1,4 @@
+import asyncio
 import json
 from copy import deepcopy
 from typing import Any
@@ -12,6 +13,7 @@ from ..reverse_project_repository import ReverseReferenceRecord
 from ..storage import StoredObject
 from .module_planning_service import ModuleMasterRequest
 from .reverse_image_analysis import observe_reference_image, observed_layout
+from .reference_content_policy import REFERENCE_ANALYSIS_POLICY, clean_reference_text
 
 
 class ReverseOverall(BaseModel):
@@ -66,6 +68,7 @@ class ReverseProjectService:
         generation_config_service: Any | None = None,
         planner: Any | None = None,
         prompt_models: Any | None = None,
+        image_observer: Any | None = None,
     ) -> None:
         self.repository = repository
         self.identity_provider = identity_provider
@@ -75,6 +78,7 @@ class ReverseProjectService:
         self.generation_config_service = generation_config_service
         self.planner = planner
         self.prompt_models = prompt_models
+        self.image_observer = image_observer
 
     @property
     def workspace_id(self) -> UUID:
@@ -181,6 +185,7 @@ class ReverseProjectService:
         project = await self.repository.claim_analysis(
             self.workspace_id, project_id, expected_revision
         )
+        analysis_stage = "整体策略"
         try:
             if not project.references:
                 raise AppError("REVERSE_ANALYSIS_REQUIRES_REFERENCES", "请先上传参考图", 400)
@@ -208,6 +213,7 @@ class ReverseProjectService:
                 planner = bound.compiler
             system_prompt = (
                 "你是电商视觉拆解专家。分析整套参考图的内容顺序、视觉系统、模块策略和适配规则。"
+                + REFERENCE_ANALYSIS_POLICY +
                 "本阶段分析整套内容职责、信息层级、文字与光影；每张参考图必须恰好对应一个模块，"
                 "referenceImageId使用对应图像标识，不能漏图或让多个模块重复引用同一张图。"
                 "layout只描述场景构图概览，具体产品机位和朝向由后续逐图观察记录决定，不编造相机角度。"
@@ -227,6 +233,11 @@ class ReverseProjectService:
                 ModuleMasterRequest(system_prompt, user_prompt, images, mimes)
             )
             parsed = ReverseAnalysisOutput.model_validate(raw).model_dump()
+            for key, value in parsed["overall"].items():
+                parsed["overall"][key] = clean_reference_text(value) or "仅使用当前商品已确认的信息与真实外观"
+            for module in parsed["modules"]:
+                for key in ("goal", "layout", "informationHierarchy", "typography", "colorAndLighting", "adaptationNotes"):
+                    module[key] = clean_reference_text(module[key]) or "仅使用当前商品已确认的信息与真实外观"
             reference_ids = {str(item.id) for item in project.references}
             module_ids = [item["id"] for item in parsed["modules"]]
             if len(module_ids) != len(set(module_ids)) or any(
@@ -241,7 +252,8 @@ class ReverseProjectService:
             # exactly one image and is the source of truth for that module's pose.
             ordered_modules = []
             for reference, image, mime in zip(project.references, images, mimes):
-                observation = await observe_reference_image(planner, str(reference.id), image, mime)
+                analysis_stage = f"第{reference.ordinal}张参考图"
+                observation = await observe_reference_image(self.image_observer or planner, str(reference.id), image, mime)
                 module = modules_by_reference[str(reference.id)]
                 module["layout"] = observed_layout(observation)
                 module["adaptationNotes"] = observation.adaptationNotes
@@ -261,17 +273,30 @@ class ReverseProjectService:
             return await self.repository.complete_analysis(
                 self.workspace_id, project_id, expected_revision, result
             )
+        except asyncio.CancelledError:
+            await asyncio.shield(self.repository.fail_analysis(
+                self.workspace_id, project_id, "反推分析请求已中断，草稿已保留，请重新分析",
+                expected_analysis_token=project.analysis_token,
+            ))
+            raise
         except Exception as exc:
             error = exc if isinstance(exc, AppError) else AppError(
                 "REVERSE_ANALYSIS_INVALID_RESPONSE"
                 if isinstance(exc, ValidationError)
                 else "REVERSE_ANALYSIS_FAILED",
-                "反推分析返回格式无效" if isinstance(exc, ValidationError) else "反推分析失败",
+                (
+                    f"{analysis_stage}返回字段无效：" + "、".join(
+                        f"{'.'.join(str(part) for part in item['loc'])}({item['type']})"
+                        for item in exc.errors(include_input=False, include_context=False)[:6]
+                    )
+                ) if isinstance(exc, ValidationError) else "反推分析失败",
                 502,
             )
-            await self.repository.fail_analysis(
-                self.workspace_id, project_id, error.message
-            )
+            if error.code == "MODULE_PLANNER_INVALID_RESPONSE":
+                error = AppError(error.code, f"{analysis_stage}：{error.message}", error.status_code)
+            await asyncio.shield(self.repository.fail_analysis(
+                self.workspace_id, project_id, error.message, expected_analysis_token=project.analysis_token
+            ))
             raise error from None
 
     async def publish(self, project_id: UUID, expected_revision: int):

@@ -4,6 +4,50 @@ from typing import Any
 from copy import deepcopy
 
 
+def reverse_execution_steps(batches, assets):
+    available = {str(asset.id): asset for asset in assets if asset.state == "available"}
+    steps, represented = [], set()
+    for batch in batches:
+        document = batch.document
+        for task in document.get("tasks", []):
+            outputs = [attempt["generatedAssetId"] for attempt in task.get("attempts", [])
+                if attempt.get("status") == "succeeded" and attempt.get("generatedAssetId") in available]
+            # Asset creation may finish before the final attempt write; its snapshot
+            # is authoritative evidence of its batch and task ownership.
+            outputs.extend(asset_id for asset_id, asset in available.items()
+                if (asset.source_snapshot or {}).get("reverseExecutionBatchId") == str(batch.id)
+                and (asset.source_snapshot or {}).get("taskId") == task["id"] and asset_id not in outputs)
+            represented.update(outputs)
+            steps.append({
+                "id": f"reverse-batch:{batch.id}:task:{task['id']}", "kind": "reverse",
+                "title": task.get("title", "项目反推"), "batchId": str(batch.id),
+                "batchCreatedAt": batch.created_at.isoformat(), "batchStatus": document.get("status"),
+                "reversePlanId": str(batch.plan_id), "reversePlanName": document.get("planName", "反推方案"),
+                "reverseBatchNo": batch.batch_no,
+                "sourceAssetIds": list(dict.fromkeys(([document["sourceAssetId"]] if document.get("sourceAssetId") else []) + document.get("auxiliarySourceAssetIds", []))),
+                "outputAssetIds": list(dict.fromkeys(outputs)), "outputVersionIds": [],
+                "finalPrompt": task.get("promptDraft", ""), "taskPrompt": "", "constraints": {},
+                "parameters": {**deepcopy(document.get("outputSettings", {})),
+                    "module": {"id": f"reverse:{batch.plan_id}:{task['id']}", "label": task.get("title", "项目反推"), "mode": "detail"},
+                    "reverseVersionId": document.get("versionId"), "structure": deepcopy(task.get("structure", {}))},
+                "canRegenerate": False,
+            })
+    for asset_id, asset in available.items():
+        snapshot = asset.source_snapshot or {}
+        plan_id = snapshot.get("reverseExecutionPlanId")
+        if asset_id in represented or not plan_id or snapshot.get("reverseExecutionBatchId"):
+            continue
+        source = getattr(asset, "source_asset_id", None)
+        created = getattr(asset, "created_at", None)
+        steps.append({"id": f"reverse-legacy:{asset_id}", "kind": "reverse",
+            "title": "历史反推结果（未记录批次）", "batchId": f"legacy-reverse:{plan_id}",
+            "batchCreatedAt": created.isoformat() if created else None, "reversePlanName": "历史反推结果（未记录批次）",
+            "sourceAssetIds": [str(source)] if source else [], "outputAssetIds": [asset_id], "outputVersionIds": [],
+            "finalPrompt": (snapshot.get("promptSnapshot") or {}).get("finalPrompt", ""), "taskPrompt": "",
+            "constraints": {}, "parameters": {}, "canRegenerate": False})
+    return steps
+
+
 def _design_brief(snapshot, prompt, batch_snapshot, parameters):
     outline = prompt.get("effectiveTaskOutline")
     if outline is None:
@@ -94,7 +138,7 @@ async def canvas_generation_steps(project_id, workspace_id, assets, batches, edi
             source_id = version.source_snapshot.get("assetId") or task.source_snapshot.get("assetId")
             steps[key] = {
                 "id": key, "kind": "white" if config.get("outputKind") == "white_background" else "edit",
-                "title": "生成白底图" if config.get("outputKind") == "white_background" else "修改图片",
+                "title": ("生成透明图" if config.get("background") == "transparent" else "生成白底图") if config.get("outputKind") == "white_background" else "修改图片",
                 "sourceAssetIds": [str(source_id)] if source_id else [], "outputAssetIds": outputs,
                 "outputVersionIds": [str(version.id)],
                 "finalPrompt": prompt.get("finalPrompt", prompt.get("summary", "")), "taskPrompt": "",

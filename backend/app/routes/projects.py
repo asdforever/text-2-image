@@ -189,7 +189,6 @@ async def delete_project(
     request: Request,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ):
-    await request.app.state.project_asset_service.delete_project_assets(project_id)
     deleted = await request.app.state.project_service.delete_project(
         project_id, idempotency_key
     )

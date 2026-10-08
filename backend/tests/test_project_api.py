@@ -19,6 +19,46 @@ def _png(color: str = "red") -> bytes:
     return output.getvalue()
 
 
+def test_project_delete_claims_idempotency_before_cleaning_assets() -> None:
+    async def run() -> None:
+        app = create_app(settings=Settings(_env_file=None), repository=InMemoryRepository(),
+                         storage=MemoryObjectStorage(), project_repository=InMemoryProjectRepository())
+        entered = asyncio.Event()
+        release = asyncio.Event()
+        cleanup_calls = 0
+        original_cleanup = app.state.project_asset_service.delete_project_assets
+
+        async def delayed_cleanup(project_id):
+            nonlocal cleanup_calls
+            cleanup_calls += 1
+            if cleanup_calls == 1:
+                entered.set()
+                await release.wait()
+            await original_cleanup(project_id)
+
+        app.state.project_asset_service.delete_project_assets = delayed_cleanup
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+            created = await client.post("/api/projects", json={"name": "删除幂等"})
+            path = f"/api/projects/{created.json()['data']['id']}"
+            headers = {"Idempotency-Key": "delete-once"}
+            first = asyncio.create_task(client.delete(path, headers=headers))
+            await entered.wait()
+            try:
+                duplicate = await client.delete(path, headers=headers)
+                assert duplicate.status_code == 409
+                assert duplicate.json()["error"]["code"] == "IDEMPOTENCY_IN_PROGRESS"
+                assert cleanup_calls == 1
+            finally:
+                release.set()
+                result = await first
+            assert result.status_code == 204
+            replay = await client.delete(path, headers=headers)
+            assert replay.status_code == 204
+            assert cleanup_calls == 1
+
+    asyncio.run(run())
+
+
 def test_project_api_uses_server_workspace_and_uniform_response_contract() -> None:
     async def run() -> None:
         project_repository = InMemoryProjectRepository()

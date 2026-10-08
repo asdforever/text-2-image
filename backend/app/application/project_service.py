@@ -18,11 +18,13 @@ class ProjectService:
         idempotency_store: IdempotencyStore,
         *,
         project_archive: Any | None = None,
+        project_assets: Any | None = None,
     ) -> None:
         self.repository = repository
         self.identity_provider = identity_provider
         self.idempotency_store = idempotency_store
         self.project_archive = project_archive
+        self.project_assets = project_assets
 
     async def create_project(
         self, name: str, idempotency_key: str | None = None
@@ -124,6 +126,8 @@ class ProjectService:
     ) -> bool:
         context = self.identity_provider.get_context()
         if not idempotency_key:
+            if self.project_assets is not None:
+                await self.project_assets.delete_project_assets(project_id)
             await self._delete_project_archive(project_id)
             deleted = await self.repository.delete_project(project_id, context.workspace_id)
             return deleted
@@ -134,6 +138,8 @@ class ProjectService:
             self._ensure_replayable(claim)
             return bool((claim.record.response_body or {}).get("deleted"))
         try:
+            if self.project_assets is not None:
+                await self.project_assets.delete_project_assets(project_id)
             await self._delete_project_archive(project_id)
             deleted = await self.repository.delete_project(project_id, context.workspace_id)
             await self.idempotency_store.complete(

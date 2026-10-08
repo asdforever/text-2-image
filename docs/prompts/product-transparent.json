@@ -1,0 +1,12 @@
+{
+  "code": "product-transparent",
+  "name": "商品透明图生成",
+  "kind": "image_to_image",
+  "kindName": "图生图",
+  "executionTarget": "image_model",
+  "stage": "task_image",
+  "body": "以上传的商品图片作为唯一产品外观参考，将原图中真实商品完整、精确地抠出，输出具有真实 Alpha 透明通道的 PNG 商品素材。保持商品的拍摄角度、朝向、透视、整体轮廓、结构、长宽比例、颜色、材质、表面纹理、Logo、标签文字及可见细节一致；保留原图中属于商品的线缆、配件、包装和真实组合关系，不改变部件数量，不补造不可见结构，不重新设计或旋转商品。仅移除背景、桌面、无关道具、人物及背景上的投影和倒影，保留商品自身的光影与真实高光。商品完整居中，四周留适度透明边距，不截断细线、线缆或边缘，不将白色商品区域误删为透明；透明和半透明材质保留其真实透光、反射与边缘细节，边缘自然干净，无白边、黑边、毛边、背景残色或过度锐化。背景像素必须真正透明，不绘制白色、灰色、黑色底板或棋盘格，不添加地面、接触阴影、光晕、文字、水印、边框、道具和装饰。输出 1:1 正方形透明 PNG，细节清晰、色彩真实，可直接叠加到其他场景中使用。",
+  "generationParams": {"background": "transparent", "output_format": "png", "size": "1024x1024"},
+  "applicability": {"runtimeRole": "direct-image", "requiresProductImages": true, "productType": "transparent_background", "background": "transparent"},
+  "changeNote": "项目商品图透明背景专用提示词；保留商品原貌，输出真实 Alpha PNG。"
+}

@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 from .hero_generation_ports import ImageEditInput, ImageEditRequest, ImageEditResult
 from .image_editing_rendering import execute_operations, load_image
 from ..core.errors import AppError
+from ..core.transparent_image import transparent_png
 from ..image_editing_repository import ImageEditVersionRecord
 from ..project_storage import project_asset_object_key
 from ..storage import StoredObject
@@ -59,6 +60,7 @@ class ImageEditingWorker:
             resolution=resolution,
             image_inputs=(ImageEditInput(source_stored.data, source_stored.content_type, source_object.original_filename),),
             model_connection=config.get("modelConnection") or parameters.get("modelConnection"),
+            background="transparent" if config.get("background") == "transparent" else None,
         )
         try:
             final_prompt = request.prompt
@@ -75,6 +77,8 @@ class ImageEditingWorker:
                 result = ImageEditResult(data, "image/png", {})
             else:
                 result = await self.image_editor.edit(request)
+            if config.get("background") == "transparent":
+                result = ImageEditResult(transparent_png(result.image_bytes), "image/png", result.provider_request)
             output_size = load_image(result.image_bytes).size
             version_id = uuid4()
             key = f"image-edit/{workspace_id}/{task.project_id}/{task.id}/{version_id}.png"
@@ -121,6 +125,7 @@ class ImageEditingWorker:
                     source_asset_id=UUID(task.source_snapshot["assetId"]),
                     source_kind="generated",
                     source_snapshot={
+                        "background": config.get("background", "white"),
                         "imageEditTaskId": str(task.id),
                         "imageEditVersionId": str(version.id),
                         "promptSnapshot": dict(task.prompt_snapshot),
@@ -135,6 +140,7 @@ class ImageEditingWorker:
                         source_version_id=asset.id,
                         preview_url=f"/api/projects/{task.project_id}/assets/{asset.id}/preview",
                         source_snapshot={
+                            "background": config.get("background", "white"),
                             "assetId": str(asset.id),
                             "imageEditTaskId": str(task.id),
                             "imageEditVersionId": str(version.id),

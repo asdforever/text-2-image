@@ -90,6 +90,7 @@ class ReverseProjectRecord:
     latest_version_id: UUID | None = None
     created_at: datetime = field(default_factory=_now)
     updated_at: datetime = field(default_factory=_now)
+    analysis_token: UUID | None = None
 
 
 def copy_project(record: ReverseProjectRecord) -> ReverseProjectRecord:
@@ -225,6 +226,7 @@ class InMemoryReverseProjectRepository:
                 raise AppError("REVERSE_ANALYSIS_RUNNING", "反推分析正在进行中", 409)
             project.analysis_status = "running"
             project.analysis_error = None
+            project.analysis_token = uuid4()
             return copy_project(project)
 
     async def complete_analysis(
@@ -242,17 +244,24 @@ class InMemoryReverseProjectRepository:
                 setattr(project, field_name, deepcopy(value))
             project.analysis_status = "completed"
             project.analysis_error = None
+            project.analysis_token = None
             project.revision += 1
             project.updated_at = _now()
             return copy_project(project)
 
     async def fail_analysis(
-        self, workspace_id: UUID, project_id: UUID, message: str
+        self, workspace_id: UUID, project_id: UUID, message: str,
+        *, expected_analysis_token: UUID | None = None,
     ) -> ReverseProjectRecord:
         async with self._lock(project_id):
             project = self._project(workspace_id, project_id)
+            if expected_analysis_token is not None and (
+                project.analysis_token != expected_analysis_token or project.analysis_status != "running"
+            ):
+                return copy_project(project)
             project.analysis_status = "failed"
             project.analysis_error = message
+            project.analysis_token = None
             return copy_project(project)
 
     async def publish(
@@ -577,9 +586,9 @@ class PostgresReverseProjectRepository:
             await session.execute(
                 text(
                     "UPDATE project_workbench.reverse_projects "
-                    "SET analysis_status='running',analysis_error=NULL WHERE id=:id"
+                    "SET analysis_status='running',analysis_error=NULL,analysis_token=:token WHERE id=:id"
                 ),
-                {"id": project_id},
+                {"id": project_id, "token": uuid4()},
             )
         return await self._required_project(workspace_id, project_id)
 
@@ -599,7 +608,7 @@ class PostgresReverseProjectRepository:
                     "UPDATE project_workbench.reverse_projects SET category=:category,summary=:summary,"
                     "suitable_for=:suitable_for,goal=:goal,required_materials=:required_materials,"
                     "not_suitable_for=:not_suitable_for,overall=CAST(:overall AS jsonb),"
-                    "modules=CAST(:modules AS jsonb),analysis_status='completed',analysis_error=NULL,"
+                    "modules=CAST(:modules AS jsonb),analysis_status='completed',analysis_error=NULL,analysis_token=NULL,"
                     "revision=revision+1,updated_at=now() WHERE id=:id"
                 ),
                 {
@@ -612,17 +621,21 @@ class PostgresReverseProjectRepository:
         return await self._required_project(workspace_id, project_id)
 
     async def fail_analysis(
-        self, workspace_id: UUID, project_id: UUID, message: str
+        self, workspace_id: UUID, project_id: UUID, message: str,
+        *, expected_analysis_token: UUID | None = None,
     ) -> ReverseProjectRecord:
         async with self.sessions() as session, session.begin():
             result = await session.execute(
                 text(
                     "UPDATE project_workbench.reverse_projects SET analysis_status='failed',"
-                    "analysis_error=:message WHERE id=:id AND workspace_id=:workspace_id RETURNING id"
+                    "analysis_error=:message,analysis_token=NULL WHERE id=:id AND workspace_id=:workspace_id "
+                    "AND (CAST(:analysis_token AS uuid) IS NULL "
+                    "OR (analysis_token=:analysis_token AND analysis_status='running')) RETURNING id"
                 ),
-                {"message": message, "id": project_id, "workspace_id": workspace_id},
+                {"message": message, "id": project_id, "workspace_id": workspace_id,
+                 "analysis_token": expected_analysis_token},
             )
-            if result.first() is None:
+            if result.first() is None and expected_analysis_token is None:
                 raise _not_found()
         return await self._required_project(workspace_id, project_id)
 
@@ -901,6 +914,7 @@ def _postgres_project(
         goal=row["goal"], required_materials=row["required_materials"],
         not_suitable_for=row["not_suitable_for"], overall=deepcopy(row["overall"]),
         modules=deepcopy(row["modules"]), analysis_status=row["analysis_status"],
+        analysis_token=row.get("analysis_token"),
         analysis_error=row["analysis_error"], revision=row["revision"], references=references,
         versions=versions, latest_version_id=row["latest_version_id"],
         created_at=row["created_at"], updated_at=row["updated_at"],

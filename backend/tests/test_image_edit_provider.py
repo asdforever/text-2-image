@@ -10,6 +10,18 @@ from backend.app.providers.openai_compatible import OpenAICompatibleImageEditor
 
 
 @pytest.mark.asyncio
+async def test_transparent_request_posts_background_and_png_fields():
+    captured = {}
+    async def handler(request):
+        captured["body"] = await request.aread()
+        return httpx.Response(200, json={"data": [{"b64_json": _b64(_png_bytes((8, 8), (20, 40, 60)))}]})
+    editor = _editor(httpx.MockTransport(handler))
+    await editor.edit(ImageEditRequest(prompt="透明商品素材", image_bytes=_png_bytes((8, 8), (20, 40, 60)), image_mime_type="image/png", image_filename="source.png", aspect_ratio="1:1", resolution="标准 1K", background="transparent"))
+    assert b'name="background"\r\n\r\ntransparent' in captured["body"]
+    assert b'name="output_format"\r\n\r\npng' in captured["body"]
+
+
+@pytest.mark.asyncio
 async def test_image_editor_posts_one_source_file_and_fixed_generation_fields() -> None:
     source = _png_bytes((8, 6), (20, 40, 60))
     generated = _png_bytes((6, 8), (100, 120, 140))

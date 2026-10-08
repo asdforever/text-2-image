@@ -171,6 +171,26 @@ async def test_white_background_versions_regenerate_from_original_and_keep_white
 
 
 @pytest.mark.asyncio
+async def test_transparent_product_regeneration_keeps_background_flag_and_alpha():
+    service, project, source, white, old, step, editor, archive = await fixture()
+    step.update(id="edit-version:transparent", kind="white", title="生成透明图", sourceAssetIds=[str(source.id)], outputAssetIds=[str(white.id)], constraints={}, taskPrompt="", finalPrompt="透明商品")
+    step["parameters"]["background"] = "transparent"
+    image = Image.new("RGBA", (8, 8), (0, 0, 0, 0))
+    image.paste((255, 0, 0, 128), (2, 2, 6, 6))
+    out = BytesIO(); image.save(out, format="PNG")
+    async def edit(request):
+        editor.requests.append(request)
+        return ImageEditResult(out.getvalue(), "image/png", {})
+    editor.edit = edit
+    revision = await service.submit(project.id, step["id"], "original", "保持透明商品", None, "transparent")
+    await service.execute(project.id, step["id"], revision["id"])
+    assert editor.requests[0].background == "transparent"
+    track = (await service.list_tracks(project.id))[0]
+    result = await service.projects.get_asset(UUID(track["currentAssetIds"][0]), service.scope)
+    assert result.source_snapshot["background"] == "transparent"
+
+
+@pytest.mark.asyncio
 async def test_canvas_routes_submit_once_and_select_only_own_completed_output():
     from backend.app.main import create_app
     from backend.app.core.config import Settings

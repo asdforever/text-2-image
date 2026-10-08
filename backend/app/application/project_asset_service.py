@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -29,6 +30,7 @@ class ProjectAssetService:
         self.max_upload_bytes = max_upload_bytes
         self.idempotency_store = idempotency_store or MemoryIdempotencyStore()
         self.project_archive = project_archive
+        self._project_cleanup_slots = asyncio.Semaphore(4)
 
     async def upload_asset(
         self,
@@ -287,14 +289,25 @@ class ProjectAssetService:
 
     async def delete_project_assets(self, project_id: UUID) -> None:
         context = self.identity_provider.get_context()
+
+        async def delete_leaf(asset: ProjectAssetRecord) -> None:
+            async with self._project_cleanup_slots:
+                await self.delete_asset(project_id, asset.id)
+
         pending = await self.repository.list_assets(project_id, context.workspace_id)
         while pending:
             source_ids = {asset.source_asset_id for asset in pending if asset.source_asset_id}
             leaves = [asset for asset in pending if asset.id not in source_ids]
             if not leaves:
                 raise AppError("INVALID_PROJECT_ASSET_GRAPH", "project assets have a cyclic source relationship", 409)
-            for asset in leaves:
-                await self.delete_asset(project_id, asset.id)
+            # Finish this dependency layer, including failures, before touching
+            # its sources or returning. Keep database/storage pressure bounded.
+            results = await asyncio.gather(
+                *(delete_leaf(asset) for asset in leaves), return_exceptions=True
+            )
+            for result in results:
+                if isinstance(result, BaseException):
+                    raise result
             pending = await self.repository.list_assets(project_id, context.workspace_id)
 
     async def get_selections(self, project_id: UUID) -> dict[str, UUID]:

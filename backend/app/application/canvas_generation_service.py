@@ -7,7 +7,8 @@ from hashlib import sha256
 from uuid import UUID, uuid4
 
 from ..core.errors import AppError
-from .hero_generation_ports import ImageEditInput, ImageEditRequest
+from ..core.transparent_image import transparent_png
+from .hero_generation_ports import ImageEditInput, ImageEditRequest, ImageEditResult
 from .idempotency import request_fingerprint
 from .hero_prompting import restore_bound_constraints
 
@@ -210,7 +211,7 @@ class CanvasGenerationService:
                     raise AppError("CANVAS_SOURCE_CHANGED", "上游图片内容与提交时的记录不一致", 409)
                 inputs.append(ImageEditInput(stored.data, snapshot["mimeType"], snapshot["filename"]))
             params = version["parameters"]
-            request = ImageEditRequest(version["finalPrompt"], inputs[0].image_bytes, inputs[0].image_mime_type, inputs[0].image_filename, str(params.get("aspectRatio") or params.get("ratio") or "1:1"), str(params.get("resolution") or params.get("size") or "标准 1K"), tuple(inputs), model_connection=params.get("modelConnection"))
+            request = ImageEditRequest(version["finalPrompt"], inputs[0].image_bytes, inputs[0].image_mime_type, inputs[0].image_filename, str(params.get("aspectRatio") or params.get("ratio") or "1:1"), str(params.get("resolution") or params.get("size") or "标准 1K"), tuple(inputs), model_connection=params.get("modelConnection"), background="transparent" if params.get("background") == "transparent" else None)
             for index in range(claimed["count"]):
                 created = None
                 try:
@@ -221,14 +222,16 @@ class CanvasGenerationService:
                     if not await self.repository.change(project_id, self.scope, step_id, None, require_live):
                         break
                     result = await self.editor.edit(request)
+                    if params.get("background") == "transparent":
+                        result = ImageEditResult(transparent_png(result.image_bytes), "image/png", result.provider_request)
                     filename = f"{version['title']}-V{version['number']}-{index + 1}.png"
                     if version["kind"] == "white":
-                        created = await self.assets.upload_asset(project_id, "white_background", result.image_bytes, result.image_mime_type, filename, source_asset_id=UUID(version["sourceAssetIds"][0]), source_kind="generated", source_snapshot={"canvasRevisionId": revision_id, "canvasStepId": step_id})
+                        created = await self.assets.upload_asset(project_id, "white_background", result.image_bytes, result.image_mime_type, filename, source_asset_id=UUID(version["sourceAssetIds"][0]), source_kind="generated", source_snapshot={"canvasRevisionId": revision_id, "canvasStepId": step_id, "background": params.get("background", "white")})
                     else:
                         created = await self.assets.create_generated_asset(project_id, result.image_bytes, result.image_mime_type, filename, source_asset_id=UUID(version["sourceAssetIds"][0]), generation_snapshot_id=UUID(revision_id))
                     raw_module = params.get("module") if isinstance(params.get("module"), dict) else None
                     module_snapshot = raw_module or {"id": version["kind"], "label": version["title"], "mode": "hero" if version["kind"] == "hero" else "detail"}
-                    await self.archive.archive_project_output(project_id=project_id, project_name=project.name, product_type={"white": "white_background", "hero": "hero", "suite": "detail", "detail": "detail"}.get(version["kind"], "edit"), source_version_id=created.id, preview_url=f"/api/projects/{project_id}/assets/{created.id}/preview", source_snapshot={"assetId": str(created.id), "canvasStepId": step_id, "canvasRevisionId": revision_id, "batchId": revision_id, "batchCreatedAt": version.get("createdAt"), "creationMode": params.get("creationMode"), "moduleId": module_snapshot.get("id"), "module": module_snapshot}, prompt_snapshot={"finalPrompt": version["finalPrompt"], "taskPrompt": version["taskPrompt"], "constraints": version["constraints"]}, config_snapshot=params)
+                    await self.archive.archive_project_output(project_id=project_id, project_name=project.name, product_type={"white": "white_background", "hero": "hero", "suite": "detail", "detail": "detail"}.get(version["kind"], "edit"), source_version_id=created.id, preview_url=f"/api/projects/{project_id}/assets/{created.id}/preview", source_snapshot={"background": params.get("background"), "assetId": str(created.id), "canvasStepId": step_id, "canvasRevisionId": revision_id, "batchId": revision_id, "batchCreatedAt": version.get("createdAt"), "creationMode": params.get("creationMode"), "moduleId": module_snapshot.get("id"), "module": module_snapshot}, prompt_snapshot={"finalPrompt": version["finalPrompt"], "taskPrompt": version["taskPrompt"], "constraints": version["constraints"]}, config_snapshot=params)
                     outputs.append({"assetId": str(created.id), "index": index})
                     # 每张图独立保存，后续中断不会丢失已完成版本。
                     def checkpoint(state):

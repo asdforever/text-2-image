@@ -294,6 +294,11 @@ def _decode_json_message_content(value: Any) -> Any:
         and payload.get("type") in {"text", "output_text"}
     ):
         payload = _decode_json_message_content(payload["content"])
+    if isinstance(payload, list) and len(payload) == 1 and isinstance(payload[0], dict):
+        # Compatible models sometimes wrap one schema result in a JSON array.
+        # Never choose between multiple results; business validation still owns
+        # every field in the single object.
+        payload = payload[0]
     if isinstance(payload, dict) and "summary" in payload and isinstance(payload.get("modules"), list):
         # Some model responses annotate the complete plan with a root `type`.
         # It carries no planning data; keep every other field for schema validation.
@@ -370,6 +375,9 @@ class OpenAICompatibleImageEditor:
             "n": "1",
             "response_format": "b64_json",
         }
+        if request.background is not None:
+            data["background"] = request.background
+            data["output_format"] = "png"
         files = [
             (
                 "image",

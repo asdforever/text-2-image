@@ -34,11 +34,16 @@ class ReverseExecutionPlanRecord:
 
 class InMemoryReverseExecutionRepository:
     def __init__(self) -> None:
-        self.records: dict[tuple[UUID, UUID], ReverseExecutionPlanRecord] = {}
+        self.records: dict[UUID, ReverseExecutionPlanRecord] = {}
 
-    async def get(self, workspace_id: UUID, project_id: UUID) -> ReverseExecutionPlanRecord | None:
-        record = self.records.get((workspace_id, project_id))
-        return deepcopy(record) if record else None
+    async def list(self, workspace_id: UUID, project_id: UUID) -> list[ReverseExecutionPlanRecord]:
+        return deepcopy(sorted((record for record in self.records.values()
+            if record.workspace_id == workspace_id and record.project_id == project_id),
+            key=lambda record: (record.created_at, str(record.id)), reverse=True))
+
+    async def get(self, workspace_id: UUID, project_id: UUID, plan_id: UUID | None = None) -> ReverseExecutionPlanRecord | None:
+        records = await self.list(workspace_id, project_id)
+        return next((record for record in records if plan_id is None or record.id == plan_id), None)
 
     async def create(
         self, workspace_id: UUID, project_id: UUID, reverse_version_id: UUID, document: dict[str, Any]
@@ -46,7 +51,7 @@ class InMemoryReverseExecutionRepository:
         record = ReverseExecutionPlanRecord(
             uuid4(), workspace_id, project_id, reverse_version_id, deepcopy(document)
         )
-        self.records[(workspace_id, project_id)] = record
+        self.records[record.id] = record
         return deepcopy(record)
 
     async def save(
@@ -55,8 +60,9 @@ class InMemoryReverseExecutionRepository:
         project_id: UUID,
         expected_revision: int,
         document: dict[str, Any],
+        plan_id: UUID | None = None,
     ) -> ReverseExecutionPlanRecord:
-        record = self.records.get((workspace_id, project_id))
+        record = await self.get(workspace_id, project_id, plan_id)
         if record is None:
             raise AppError("REVERSE_EXECUTION_NOT_FOUND", "项目反推方案不存在", 404)
         if record.revision != expected_revision:
@@ -64,6 +70,7 @@ class InMemoryReverseExecutionRepository:
         record.document = deepcopy(document)
         record.revision += 1
         record.updated_at = _now()
+        self.records[record.id] = record
         return deepcopy(record)
 
     async def ready(self) -> bool:
@@ -74,15 +81,25 @@ class PostgresReverseExecutionRepository:
     def __init__(self, sessions) -> None:
         self.sessions = sessions
 
-    async def get(self, workspace_id: UUID, project_id: UUID) -> ReverseExecutionPlanRecord | None:
+    async def list(self, workspace_id: UUID, project_id: UUID) -> list[ReverseExecutionPlanRecord]:
+        async with self.sessions() as session:
+            rows = await session.execute(text(
+                "SELECT id, workspace_id, project_id, reverse_version_id, document, revision, created_at, updated_at "
+                "FROM project_workbench.reverse_execution_plans WHERE workspace_id=:workspace AND project_id=:project "
+                "ORDER BY created_at DESC,id DESC"), {"workspace": workspace_id, "project": project_id})
+            return [_record(row) for row in rows.mappings()]
+
+    async def get(self, workspace_id: UUID, project_id: UUID, plan_id: UUID | None = None) -> ReverseExecutionPlanRecord | None:
         async with self.sessions() as session:
             row = await session.execute(
                 text(
                     "SELECT id, workspace_id, project_id, reverse_version_id, document, revision, created_at, updated_at "
                     "FROM project_workbench.reverse_execution_plans "
-                    "WHERE workspace_id=:workspace AND project_id=:project"
+                    "WHERE workspace_id=:workspace AND project_id=:project "
+                    + ("AND id=:plan " if plan_id is not None else "")
+                    + "ORDER BY created_at DESC,id DESC LIMIT 1"
                 ),
-                {"workspace": workspace_id, "project": project_id},
+                {"workspace": workspace_id, "project": project_id, "plan": plan_id},
             )
             value = row.mappings().first()
             return _record(value) if value else None
@@ -98,10 +115,7 @@ class PostgresReverseExecutionRepository:
                 text(
                     "INSERT INTO project_workbench.reverse_execution_plans "
                     "(id,workspace_id,project_id,reverse_version_id,document,revision) "
-                    "VALUES (:id,:workspace,:project,:version,CAST(:document AS jsonb),:revision) "
-                    "ON CONFLICT (workspace_id,project_id) DO UPDATE SET "
-                    "reverse_version_id=EXCLUDED.reverse_version_id, document=EXCLUDED.document, "
-                    "revision=reverse_execution_plans.revision+1, updated_at=now()"
+                    "VALUES (:id,:workspace,:project,:version,CAST(:document AS jsonb),:revision)"
                 ),
                 {
                     "id": record.id,
@@ -112,7 +126,7 @@ class PostgresReverseExecutionRepository:
                     "revision": 1,
                 },
             )
-        saved = await self.get(workspace_id, project_id)
+        saved = await self.get(workspace_id, project_id, record.id)
         if saved is None:
             raise RuntimeError("reverse execution plan insert did not persist")
         return saved
@@ -123,28 +137,33 @@ class PostgresReverseExecutionRepository:
         project_id: UUID,
         expected_revision: int,
         document: dict[str, Any],
+        plan_id: UUID | None = None,
     ) -> ReverseExecutionPlanRecord:
+        current = await self.get(workspace_id, project_id, plan_id)
+        if current is None:
+            raise AppError("REVERSE_EXECUTION_NOT_FOUND", "项目反推方案不存在", 404)
         async with self.sessions() as session, session.begin():
             result = await session.execute(
                 text(
                     "UPDATE project_workbench.reverse_execution_plans SET document=CAST(:document AS jsonb), "
                     "revision=revision+1, updated_at=now() "
-                    "WHERE workspace_id=:workspace AND project_id=:project AND revision=:revision "
+                    "WHERE workspace_id=:workspace AND project_id=:project AND id=:plan AND revision=:revision "
                     "RETURNING id"
                 ),
                 {
                     "workspace": workspace_id,
                     "project": project_id,
                     "revision": expected_revision,
+                    "plan": current.id,
                     "document": json.dumps(document, ensure_ascii=False),
                 },
             )
             if result.first() is None:
-                existing = await self.get(workspace_id, project_id)
+                existing = await self.get(workspace_id, project_id, current.id)
                 if existing is None:
                     raise AppError("REVERSE_EXECUTION_NOT_FOUND", "项目反推方案不存在", 404)
                 raise _conflict()
-        saved = await self.get(workspace_id, project_id)
+        saved = await self.get(workspace_id, project_id, current.id)
         if saved is None:
             raise RuntimeError("reverse execution plan update did not persist")
         return saved

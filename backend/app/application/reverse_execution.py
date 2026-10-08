@@ -1,8 +1,11 @@
 """Domain rules for turning a published reverse analysis into executable tasks."""
 
 from copy import deepcopy
+import re
 from typing import Any
 from uuid import UUID, uuid4
+
+from .reference_content_policy import clean_reference_text, REFERENCE_OVERLAY_GUARD
 
 
 _STRUCTURE_FIELDS = (
@@ -44,6 +47,7 @@ def build_execution_plan(document: dict[str, Any], version_id: UUID) -> dict[str
             structure["goal"] = str(overall.get("moduleStrategy", ""))
             structure["colorAndLighting"] = str(overall.get("visualSystem", ""))
             structure["adaptationNotes"] = str(overall.get("adaptationRules", ""))
+        structure = {key: clean_reference_text(value) for key, value in structure.items()}
         tasks.append(
             {
                 "id": str(uuid4()),
@@ -68,9 +72,40 @@ def build_execution_plan(document: dict[str, Any], version_id: UUID) -> dict[str
     }
 
 
-def compile_task_prompt(task: dict[str, Any], product_facts: dict[str, Any] | None = None, output_settings: dict[str, Any] | None = None) -> str:
-    """Compile an auditable prompt while keeping the reference structure explicit."""
-    structure = task.get("structure") or {}
+def _render_layout(layout: str) -> str:
+    # Evidence and uncertainty belong to the saved analysis, not to the
+    # photographer's execution brief. Leave the original task untouched.
+    return "\n".join(line for line in layout.splitlines()
+        if not line.strip().startswith(("观察依据：", "不确定项：")))
+
+
+def _sentence(value: str) -> str:
+    text = " ".join(value.splitlines()).strip().rstrip("；;")
+    return text + ("" if not text or text.endswith(("。", "！", "？", ".", "!", "?")) else "。")
+
+
+def _describe_layout(layout: str) -> str:
+    """Turn analysis labels into shooting instructions without losing geometry."""
+    text = re.sub(r"主体数量：\s*(\d+)", r"画面包含\1个主体", _render_layout(layout))
+    for label, description in (
+        ("场景与空间：", ""),
+        ("位置与占画比例：", "主体的摆位及占画比例为"),
+        ("相机机位：", "镜头采用"),
+        ("产品朝向与长轴：", "商品摆放方向为"),
+        ("前后端/部件锚点：", "参考姿态的前后端通过这些特征定位："),
+        ("功能前端证据：", "功能前端定位依据为"),
+        ("可见面：", "镜头中展示"),
+        ("可见侧壁定位：", "可见侧壁对应"),
+        ("裁切与遮挡：", "取景和遮挡保持如下关系："),
+        ("接触与投影：", "承托及阴影表现为"),
+    ):
+        text = text.replace(label, description)
+    return "".join(_sentence(line) for line in text.splitlines() if line.strip())
+
+
+def compile_task_prompt(task: dict[str, Any], product_facts: dict[str, Any] | None = None, output_settings: dict[str, Any] | None = None, *, product_image_count: int = 1) -> str:
+    """Compile current inputs as descriptive prose; keep analysis in the plan."""
+    structure = {key: clean_reference_text(str(value)) for key, value in (task.get("structure") or {}).items()}
     facts = product_facts or {}
     # Before 自动填写 runs, preserve the legacy behavior of making all
     # confirmed facts available to every prompt. Once the planner has marked
@@ -78,30 +113,29 @@ def compile_task_prompt(task: dict[str, Any], product_facts: dict[str, Any] | No
     if task.get("parametersAssigned") or task.get("moduleParameters"):
         facts = {key: value for key, value in facts.items() if key == "商品名称"}
         facts.update({item["key"]: item["value"] for item in task["moduleParameters"] if item.get("key", "").strip() and item.get("value", "").strip()})
-    facts_text = "；".join(f"{key}：{value}" for key, value in facts.items() if str(value).strip()) or "以当前项目已确认商品事实为准"
-    return "\n".join(
-        [
-            "项目反推执行任务。依据下列模块拆解保持模板结构与信息职责。",
-            "输入图片只用于确认当前商品的外形、结构、颜色、材质和标识；不沿用输入图片的背景。",
-            f"任务：{task.get('title', '')}",
-            f"目标：{structure.get('goal', '')}",
-            f"场景与构图：{structure.get('layout', '')}",
-            "产品呈现约束：机位与产品姿态以场景与构图中的拆解描述为准。"
-            "将当前商品作为真实三维物体重新摆放和拍摄，不得沿用商品输入图的拍摄角度和摆放方向，"
-            "也不能仅在二维画面中旋转原图来代替机位变化。"
-            "画面左右均以观看者为准，按拆解中前端与后端的部件锚点、长轴方向、可见面和俯视高度呈现商品；"
-            "主体数量、画面位置、占画比例、留白、裁切和遮挡关系须与拆解描述一致，接触面和投影须自然。"
-            "不得通过镜像翻转商品来满足朝向，不能为突出卖点自行改成更高的俯视或另一个可见侧面。"
-            "商品的真实结构、部件位置、比例、颜色、材质、纹样和标识仍以商品输入图及已确认事实为准，"
-            "不得为模仿参考商品而删除当前商品的线缆、按键、接口等部件，不编造未确认的结构。",
-            f"信息层级：{structure.get('informationHierarchy', '')}",
-            f"字体与文字区域：{structure.get('typography', '')}",
-            f"色彩与光影：{structure.get('colorAndLighting', '')}",
-            f"适配要求：{structure.get('adaptationNotes', '')}",
-            f"当前商品事实：{facts_text}",
-            f"输出语言：{(output_settings or {}).get('outputLanguage', '中文')}。需要文字时只使用本图分配的事实；模板要求无字时保持无字。",
-            "按拆解描述重新生成场景与道具，遵循描述中的机位、主体摆位、留白关系、色彩和光影；"
-            "仅未描述的背景和道具细节可合理设计，不得借此改变已有的产品呈现约束。",
-            "商品以输入图片和当前商品事实为准；参考分析中的其他商品、品牌、参数及宣传文案不得直接沿用或编造成当前商品事实。",
-        ]
-    )
+    facts_text = "，".join(f"{key}为“{value}”" for key, value in facts.items() if str(value).strip())
+    title = clean_reference_text(str(task.get("title", "")))
+    layout = _describe_layout(structure.get("layout", ""))
+    hierarchy = re.sub(r"(第[一二三四五六七八九十\d]+层)[:：]", r"\1突出", structure.get("informationHierarchy", ""))
+    language = (output_settings or {}).get("outputLanguage", "中文")
+    paragraphs = [
+        "以输入商品图作为唯一外观参考，保持真实轮廓、结构、比例、颜色、材质、纹理、部件、配件、包装和实体Logo。"
+        + (f"本页使用的已确认信息是{facts_text}。" if facts_text else "商品信息仅使用当前已确认资料。")
+        + (f"为该商品创作{title}。" if title else "为该商品创作对应的电商页面。"),
+        layout,
+        ("画面的内容职责是" + _sentence(structure["goal"])) if structure.get("goal") else "",
+        ("色彩与受光表现为" + _sentence(structure["colorAndLighting"])) if structure.get("colorAndLighting") else "",
+        ("视觉阅读顺序为" + _sentence(hierarchy)) if hierarchy else "",
+        ("文字排版采用" + _sentence(structure["typography"])) if structure.get("typography") else "",
+        _sentence(structure.get("adaptationNotes", "")),
+        "按上述机位、朝向、可见面与占画比例重新摆放和拍摄商品，不沿用输入图的拍摄姿态，不通过镜像或二维旋转代替。"
+        "不擅自放大主体或改换可见侧面。"
+        "参考页的商品颜色、部件和连接方式仅用于理解摆位，当前商品外观及结构始终以输入图为准，不删除真实部件或硬造结构。"
+        "商品与场景共用同一相机透视，受光、反射、景深与环境一致，保留真实颜色材质，不出现抠图白边。"
+        "有接触的支撑处生成贴合的阴影，悬浮或夹持时保留原支撑关系；有线商品保留线缆，从真实连接点自然弯曲，不穿插或硬折。"
+        f"需要文字时使用{language}，标题、卖点与参数仅取自本页已确认信息，缺失信息不编造，无字页面保持无字。"
+        "仅迁移已有场景、道具、光影和排版，信息缺失时保守补全，不新增装饰，不复制参考商品的品牌、型号、数字或宣传结论。"
+        + REFERENCE_OVERLAY_GUARD,
+    ]
+    from .reverse_product_images import product_view_guidance
+    return product_view_guidance(product_image_count) + "".join(paragraph for paragraph in paragraphs if paragraph)

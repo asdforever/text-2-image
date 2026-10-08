@@ -34,6 +34,44 @@ class RecordingArchive:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("valid_alpha", [True, False])
+@pytest.mark.parametrize("opacity", [255, 128])
+async def test_transparent_output_keeps_alpha_and_rejects_opaque_results(valid_alpha, opacity):
+    workspace_id = UUID(int=66)
+    identity = LocalSingleUserIdentityProvider(IdentityContext(UUID(int=1), workspace_id, "owner"))
+    projects = InMemoryProjectRepository()
+    project = await projects.create_project("透明图项目", workspace_id)
+    storage = MemoryProjectAssetStorage()
+    assets = ProjectAssetService(projects, storage, identity)
+    source = await assets.upload_asset(project.id, "source", _png(), "image/png", "原图.png")
+    service = ImageEditingService(None, projects, identity)
+    session = await service.create_session(project.id, source.id)
+    task = await service.submit_session(session.id, prompt_snapshot={"summary": "保留产品，透明背景"}, config_snapshot={"outputKind": "white_background", "background": "transparent", "outputFilename": "透明图.png"})
+    image = Image.new("RGBA", (8, 8), (255, 255, 255, 0))
+    image.paste((255, 0, 0, opacity), (2, 2, 6, 6))
+    output = BytesIO()
+    (image if valid_alpha else image.convert("RGB")).save(output, format="PNG")
+    editor = FakeEditor()
+    async def edit(request):
+        editor.requests.append(request)
+        return ImageEditResult(output.getvalue(), "image/png", {})
+    editor.edit = edit
+    await ImageEditingWorker(service.repository, projects, storage, service, editor, assets).process_task(task.id)
+    assert editor.requests[0].background == "transparent"
+    results = [asset for asset in await assets.list_assets(project.id) if asset.kind == "white_background"]
+    if valid_alpha:
+        assert task.status == "succeeded"
+        assert results[0].source_snapshot["background"] == "transparent"
+        obj = await projects.get_object(results[0].object_id, workspace_id)
+        stored = await storage.get(obj.storage_key)
+        assert Image.open(BytesIO(stored.data)).getchannel("A").getextrema() == (0, opacity)
+    else:
+        assert task.status == "failed"
+        assert "透明" in task.attempts[-1].error_message
+        assert not task.versions and not results
+
+
+@pytest.mark.asyncio
 async def test_canvas_edit_passes_the_real_instruction_and_archives_the_result_as_project_asset():
     workspace_id = UUID(int=65)
     identity = LocalSingleUserIdentityProvider(IdentityContext(UUID(int=1), workspace_id, "owner"))

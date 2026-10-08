@@ -1,6 +1,7 @@
 """Exercise the planning agent through its real model HTTP boundary."""
 import asyncio
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import httpx
@@ -10,6 +11,7 @@ from backend.app.application.module_planning_service import ModuleMasterRequest
 from backend.app.core.errors import AppError
 from backend.app.providers.openai_compatible import OpenAICompatibleModulePlanner
 from backend.tests.test_module_planning import fixture, output
+from backend.app.application.reverse_image_analysis import ProductDetailObservation
 
 
 def response(value):
@@ -25,6 +27,31 @@ def planner(handler, base_url="https://vision.example.test"):
         base_url=base_url, api_key="test-key", model="vision-model",
         timeout_ms=1000, transport=httpx.MockTransport(handler),
     )
+
+
+@pytest.mark.asyncio
+async def test_agent_accepts_captured_single_reference_array_without_losing_pose():
+    raw = json.loads((Path(__file__).parent / "fixtures/planner-single-reference-array.json").read_text(encoding="utf-8"))
+
+    async def handler(request):
+        return response(raw)
+
+    result = await planner(handler).plan_modules(ModuleMasterRequest("JSON", "局部复核", [b"png"], ["image/png"]))
+    observation = ProductDetailObservation.model_validate(result)
+    assert observation.referenceImageId == "2c4b584d-dc0e-4f80-abc5-b4d149d5ea76"
+    assert observation.axisAnchors.front.x == 0.85
+    assert observation.axisAnchors.rear.x == 0.18
+    assert observation.visibleSideAnchor.y == 0.55
+
+
+@pytest.mark.asyncio
+async def test_agent_does_not_choose_one_of_multiple_array_results():
+    async def handler(request):
+        return response([{"summary": "first"}, {"summary": "second"}])
+
+    with pytest.raises(AppError) as error:
+        await planner(handler).plan_modules(ModuleMasterRequest("JSON", "商品", [b"png"], ["image/png"]))
+    assert error.value.code == "MODULE_PLANNER_INVALID_RESPONSE"
 
 
 @pytest.mark.asyncio

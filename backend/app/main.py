@@ -68,7 +68,8 @@ from .routes.image_editing import image_editing_router
 from .application.image_editing_service import ImageEditingService
 from .application.image_editing_worker import ImageEditingWorker
 from .application.canvas_generation_service import CanvasGenerationService
-from .application.canvas_lineage import canvas_generation_steps
+from .application.canvas_lineage import canvas_generation_steps, reverse_execution_steps
+from .reverse_execution_batch_repository import MemoryReverseBatchRepository, PostgresReverseBatchRepository
 from .canvas_generation_repository import MemoryCanvasGenerationRepository, PostgresCanvasGenerationRepository
 from .routes.canvas_generations import canvas_generation_router
 from .application.style_harmonization_service import StyleHarmonizationService
@@ -272,12 +273,6 @@ def create_app(
         idempotency_store=resolved_idempotency_store,
         max_upload_bytes=cfg.max_upload_bytes,
     )
-    resolved_project_service = project_service or ProjectService(
-        resolved_project_repository,
-        resolved_identity_provider,
-        resolved_idempotency_store,
-        project_archive=resolved_project_archive,
-    )
     resolved_project_asset_service = project_asset_service or ProjectAssetService(
         resolved_project_repository,
         resolved_project_asset_storage,
@@ -285,6 +280,13 @@ def create_app(
         max_upload_bytes=cfg.max_upload_bytes,
         idempotency_store=resolved_idempotency_store,
         project_archive=resolved_project_archive,
+    )
+    resolved_project_service = project_service or ProjectService(
+        resolved_project_repository,
+        resolved_identity_provider,
+        resolved_idempotency_store,
+        project_archive=resolved_project_archive,
+        project_assets=resolved_project_asset_service,
     )
 
     app.state.repository = repo; app.state.storage = object_storage; app.state.settings = cfg
@@ -466,8 +468,11 @@ def create_app(
         resolved_reverse_project_service,
         parameter_planner=reverse_parameter_planner,
     )
+    reverse_batch_repository = (PostgresReverseBatchRepository(session_factory) if session_factory is not None else MemoryReverseBatchRepository())
     resolved_reverse_execution_generation_service = reverse_execution_generation_service or ReverseExecutionGenerationService(
         plan_service=resolved_reverse_execution_service,
+        batch_repository=reverse_batch_repository,
+        timeout_ms=cfg.image_generation_timeout_ms,
         repository=resolved_reverse_execution_repository,
         project_repository=resolved_project_repository,
         project_asset_service=resolved_project_asset_service,
@@ -481,6 +486,7 @@ def create_app(
     app.state.reverse_execution_repository = resolved_reverse_execution_repository
     app.state.reverse_execution_service = resolved_reverse_execution_service
     app.state.reverse_execution_generation_service = resolved_reverse_execution_generation_service
+    app.state.reverse_execution_batch_repository = reverse_batch_repository
     resolved_module_service = module_planning_service or ModulePlanningService(
         resolved_module_repository, resolved_project_repository, resolved_project_asset_storage,
         resolved_generation_config_service, prompt_repo, resolved_identity_provider,
@@ -543,7 +549,9 @@ def create_app(
         scope = resolved_identity_provider.get_context().workspace_id
         assets = await resolved_project_repository.list_assets(project_id, scope)
         edits = await resolved_image_editing_service.repository.list_tasks(project_id, scope)
-        return await canvas_generation_steps(project_id, scope, assets, resolved_batch_generation_repository, edits)
+        steps = await canvas_generation_steps(project_id, scope, assets, resolved_batch_generation_repository, edits)
+        steps.extend(reverse_execution_steps(await resolved_reverse_execution_generation_service.list_batches(project_id), assets))
+        return steps
 
     app.state.canvas_generation_service = CanvasGenerationService(
         PostgresCanvasGenerationRepository(session_factory) if session_factory is not None else MemoryCanvasGenerationRepository(),
@@ -665,6 +673,7 @@ def create_app(
         checks["batchGeneration"] = await resolved_batch_generation_repository.ready()
         checks["suitePlanning"] = await resolved_suite_planning_repository.ready()
         checks["workbench"] = await resolved_workbench_repository.ready() if hasattr(resolved_workbench_repository, "ready") else True
+        checks["reverseBatches"] = await reverse_batch_repository.ready()
         if not all(checks.values()):
             failed = ", ".join(name for name, ok in checks.items() if not ok)
             return error_response(

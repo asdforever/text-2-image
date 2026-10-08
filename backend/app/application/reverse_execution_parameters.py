@@ -36,6 +36,8 @@ class ReverseExecutionParameterPlanner:
             raise AppError("REVERSE_SOURCE_ASSET_REQUIRED", "请先选择商品原图或白底图", 400)
         _, source_object = await self.assets.get_asset_details(project_id, UUID(source_id))
         source = await self.assets.get_preview(project_id, UUID(source_id))
+        from .reverse_product_images import load_product_images, normalize_auxiliary_ids, product_view_guidance
+        auxiliary, _ = await load_product_images(self.assets, project_id, normalize_auxiliary_ids(document.get("auxiliarySourceAssetIds", []), source_id))
         planner, connection = self.planner, None
         if self.config_service and self.prompt_models:
             published = await self.config_service.get_published()
@@ -58,7 +60,7 @@ class ReverseExecutionParameterPlanner:
         }
         try:
             async with asyncio.timeout(540):
-                raw = await planner.plan_modules(ModuleMasterRequest(system, json.dumps(context, ensure_ascii=False), [source.data], [source_object.media_type]))
+                raw = await planner.plan_modules(ModuleMasterRequest(system + product_view_guidance(1 + len(auxiliary)), json.dumps(context, ensure_ascii=False), [source.data, *(item.image_bytes for item in auxiliary)], [source_object.media_type, *(item.image_mime_type for item in auxiliary)]))
             result = ParameterAssignment.model_validate(raw).model_dump()
             ids = [task["taskId"] for task in result["tasks"]]
             expected = [task["id"] for task in document.get("tasks", [])]

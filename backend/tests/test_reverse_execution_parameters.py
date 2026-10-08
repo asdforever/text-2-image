@@ -67,3 +67,18 @@ async def test_auto_fill_assigns_by_task_identity_and_preserves_structure(invali
     assert "100×60mm" not in compiled.document["tasks"][0]["promptDraft"]
     assert "100×60mm" in compiled.document["tasks"][1]["promptDraft"]
     assert "静音按键" not in compiled.document["tasks"][1]["promptDraft"]
+
+
+@pytest.mark.asyncio
+async def test_preview_assignment_failure_keeps_inputs_and_revision_unchanged():
+    repository = InMemoryReverseExecutionRepository()
+    service = ReverseExecutionService(repository, FakeIdentity(uuid4()), FakeProjectRepository(), FakeReverseService(),
+        parameter_planner=ReverseExecutionParameterPlanner(planner=FakePlanner(invalid=True), project_asset_service=FakeAssets()))
+    project_id = uuid4()
+    created = await service.generate(project_id, uuid4(), source_asset_id=uuid4(), parameter_brief="静音按键")
+    with pytest.raises(AppError) as error:
+        await service.compile(project_id, created.revision, {"商品名称": "新商品"}, plan_id=created.id)
+    assert error.value.code == "REVERSE_PARAMETERS_INVALID_RESPONSE"
+    after = await service.get(project_id, created.id)
+    assert after.revision == created.revision
+    assert after.document == created.document

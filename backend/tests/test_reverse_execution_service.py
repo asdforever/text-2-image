@@ -70,3 +70,19 @@ async def test_service_generates_ordered_plan_and_compiles_each_task():
     saved = await service.save(project_id, recompiled.revision, changed)
     assert all(not task["promptDraft"] for task in saved.document["tasks"])
     assert all(task["status"] == "draft" for task in saved.document["tasks"])
+
+
+@pytest.mark.asyncio
+async def test_compiled_preview_and_client_prompt_are_not_persisted_in_plan():
+    workspace_id, project_id = uuid4(), uuid4()
+    repository = InMemoryReverseExecutionRepository()
+    service = ReverseExecutionService(repository, FakeIdentity(workspace_id), FakeProjectRepository(), FakeReverseService())
+    created = await service.generate(project_id, uuid4())
+    preview = await service.compile(project_id, created.revision, {"商品名称": "真实鼠标"})
+    assert "真实鼠标" in preview.document["tasks"][0]["promptDraft"]
+    persisted = await repository.get(workspace_id, project_id, created.id)
+    assert all(not task.get("promptDraft") for task in persisted.document["tasks"])
+    preview.document["tasks"][0]["promptDraft"] = "旧的完整提示词"
+    await service.save(project_id, preview.revision, preview.document, plan_id=created.id)
+    persisted = await repository.get(workspace_id, project_id, created.id)
+    assert all(not task.get("promptDraft") for task in persisted.document["tasks"])

@@ -44,6 +44,7 @@ class ImageEditRequest:
     resolution: str
     image_inputs: tuple[ImageEditInput, ...] = ()
     model_connection: dict | None = None
+    background: Literal["transparent", "opaque", "auto"] | None = None
 
     def ordered_image_inputs(self) -> tuple[ImageEditInput, ...]:
         if self.image_inputs:
