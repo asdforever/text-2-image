@@ -7,7 +7,7 @@ from uuid import UUID
 from ..batch_generation_repository import ConfirmedGenerationModuleInput
 from ..core.errors import AppError
 from .idempotency import request_fingerprint
-from .module_planning_v2 import compose_v2_from_snapshot, render_v2_from_snapshot
+from .module_planning_v2 import render_v2_from_snapshot
 
 
 class SuitePlanningConfirmationService:
@@ -74,9 +74,9 @@ class SuitePlanningConfirmationService:
         for module in detail.modules:
             task_prompt = normalized_prompts[module.module_key]
             frozen_prompt = render_regular(module.prompt_snapshot) if module.prompt_snapshot.get("creationMode") == "regular" else render_v2_from_snapshot(module.prompt_snapshot)
-            if task_prompt != frozen_prompt:
-                raise AppError("V2_PROMPT_READ_ONLY", "提示词不可直接修改，请调整模块参数后重新编译", 400)
-            final_prompt = frozen_prompt if module.prompt_snapshot.get("creationMode") == "regular" else compose_v2_from_snapshot(module.prompt_snapshot)
+            if module.compiled_task_prompt != frozen_prompt:
+                raise AppError("MODULE_PLANNING_SNAPSHOT_INVALID", "模块编译结果与冻结快照不一致", 500)
+            final_prompt = task_prompt
             final_hash = sha256(final_prompt.encode("utf-8")).hexdigest()
             frozen_module = {
                 "id": str(module.id),

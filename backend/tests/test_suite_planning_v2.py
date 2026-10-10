@@ -66,7 +66,7 @@ async def test_suite_v2_one_call_per_task_and_frozen_structure_with_full_outline
 
 
 @pytest.mark.asyncio
-async def test_suite_v2_confirm_uses_saved_plan_and_rejects_override_after_rollback():
+async def test_suite_v2_confirm_preserves_manual_prompt_and_original_compile():
     f = await fixture_v2()
     plan = await f.service.compile_plan(f.project_id, f.request, "v2-confirm")
     detail = await f.service.get_plan(f.project_id, plan.id)
@@ -74,10 +74,8 @@ async def test_suite_v2_confirm_uses_saved_plan_and_rejects_override_after_rollb
     confirm = SuitePlanningConfirmationService(
         plan_repository=f.plans, batch_repository=f.batches, identity_provider=f.service.identity_provider,
     )
-    with pytest.raises(AppError) as error:
-        await confirm.confirm_plan(f.project_id, plan.id, expected_plan_revision=plan.revision,
-                                   module_task_prompts={**prompts, "overall": "修改背景与比例"}, idempotency_key="invalid")
-    assert error.value.code == "V2_PROMPT_READ_ONLY"
+    original = dict(prompts)
+    prompts["overall"] = "修改背景与比例"
     batch = await confirm.confirm_plan(f.project_id, plan.id, expected_plan_revision=plan.revision,
                                       module_task_prompts=prompts, idempotency_key="confirm")
     generated = await f.batches.get_batch_detail(batch.id, f.workspace_id)
@@ -85,6 +83,8 @@ async def test_suite_v2_confirm_uses_saved_plan_and_rejects_override_after_rollb
     for row in generated.module_tasks:
         assert row.final_prompt_sha256 == sha256(row.final_prompt.encode()).hexdigest()
         assert row.confirmed_task_prompt == prompts[row.module_key]
+        assert row.final_prompt == prompts[row.module_key]
+        assert row.compiled_task_prompt == original[row.module_key]
     replay = await confirm.confirm_plan(f.project_id, plan.id, expected_plan_revision=plan.revision,
                                        module_task_prompts=prompts, idempotency_key="confirm")
     assert replay.id == batch.id

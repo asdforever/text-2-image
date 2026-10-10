@@ -68,7 +68,7 @@ async def test_incomplete_module_edits_leave_batch_awaiting_confirmation() -> No
 
 
 @pytest.mark.asyncio
-async def test_v2_batch_confirmation_rejects_mutation_and_recomposes_frozen_modules() -> None:
+async def test_v2_batch_confirmation_preserves_manual_prompt_and_original_compile() -> None:
     fixture = await _fixture(planner_version="v2")
     fixture.compiler = RecordingV2Compiler()
     fixture.service.prompt_compiler = fixture.compiler
@@ -81,21 +81,15 @@ async def test_v2_batch_confirmation_rejects_mutation_and_recomposes_frozen_modu
     service = BatchGenerationConfirmationService(fixture.repository, fixture.service.identity_provider)
 
     changed = dict(compiled)
-    changed["hero-kv"] += " 绕过服务端构图"
-    with pytest.raises(AppError) as raised:
-        await service.confirm_batch(
-            fixture.project_id, batch.id, changed, "confirm-v2-changed"
-        )
-    assert raised.value.code == "BATCH_GENERATION_V2_PROMPT_IMMUTABLE"
+    changed["hero-kv"] += " 右侧增加留白"
 
     confirmed = await service.confirm_batch(
-        fixture.project_id, batch.id, compiled, "confirm-v2"
+        fixture.project_id, batch.id, changed, "confirm-v2"
     )
     confirmed_detail = await fixture.repository.get_batch_detail(
         confirmed.id, fixture.workspace_id
     )
     assert confirmed_detail is not None
-    assert all(
-        task.final_prompt.strip()
-        for task in confirmed_detail.module_tasks
-    )
+    for task in confirmed_detail.module_tasks:
+        assert task.final_prompt == task.confirmed_task_prompt == changed[task.module_key]
+        assert task.compiled_task_prompt == compiled[task.module_key]

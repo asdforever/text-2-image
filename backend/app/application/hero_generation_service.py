@@ -24,7 +24,6 @@ from .module_planning_v2 import (
     parse_v2_result,
     render_v2_module_prompt,
     render_v2_from_snapshot,
-    compose_v2_from_snapshot,
 )
 
 
@@ -300,10 +299,9 @@ class HeroGenerationService:
             )
         confirmed_prompt = render_v2_from_snapshot(task.snapshot)
         submitted_prompt = confirmed_prompt if task_prompt is None else task_prompt.strip()
-        if submitted_prompt != confirmed_prompt:
-            raise AppError("HERO_GENERATION_V2_PROMPT_IMMUTABLE", "任务提示词由服务端生成，确认时不能修改", 409)
         if task.compiled_task_prompt != confirmed_prompt:
             raise AppError("MODULE_PLANNING_SNAPSHOT_INVALID", "模块规划提示词与冻结快照不一致", 500)
+        confirmed_prompt = submitted_prompt
         if not confirmed_prompt:
             raise AppError(
                 "INVALID_HERO_TASK_PROMPT",
@@ -355,7 +353,7 @@ class HeroGenerationService:
         if stored is None:
             raise AppError("OBJECT_NOT_FOUND", "source image object does not exist", 404)
         selection = task.snapshot.get("selection", {})
-        final_prompt = compose_v2_from_snapshot(task.snapshot)
+        final_prompt = confirmed_prompt
         edit_request = ImageEditRequest(
             prompt=final_prompt,
             image_bytes=stored.data,

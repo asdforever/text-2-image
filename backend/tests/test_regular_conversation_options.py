@@ -29,9 +29,48 @@ def make_snapshot(options=None):
         {'label': '淘宝'}, {'id': 'minimal'}, Cards())
 
 
-def test_absent_options_preserve_existing_prompt_and_custom_parameters():
+def test_absent_options_default_to_flexible_copy_and_preserve_other_rules():
     baseline = json.loads((Path(__file__).parent / 'fixtures/regular-conversation-default.json').read_text(encoding='utf-8'))
-    assert make_snapshot() == baseline
+    result = make_snapshot()
+    assert result['regularOptions']['copyPolicy'] == 'flexible'
+    context = json.loads(result['compiledTaskPrompt'].split('\n', 1)[1])
+    assert context['suggestedCopy'] == '滚轮细节'
+    assert 'approvedCopy' not in context
+    for key in baseline.keys() - {'compiledTaskPrompt'}:
+        assert result[key] == baseline[key]
+
+
+def test_visual_requirements_alone_do_not_lock_copy():
+    result = make_snapshot({'visualRequirements': '左侧留白'})
+    assert result['regularOptions']['copyPolicy'] == 'flexible'
+    assert 'Render approvedCopy' not in result['compiledTaskPrompt']
+
+
+def test_explicit_copy_lock_preserves_literal_copy():
+    context = json.loads(make_snapshot({'copyPolicy': 'fixed'})['compiledTaskPrompt'].split('\n', 1)[1])
+    assert context['approvedCopy'] == '滚轮细节'
+    assert 'suggestedCopy' not in context
+
+
+@pytest.mark.asyncio
+async def test_latest_custom_parameters_override_stale_planning_assumptions():
+    f = await _fixture()
+    facts = [{'key': '退货政策', 'value': '7天免费退货'}, {'key': '排版要求', 'value': '保障信息作为主标题'}]
+    request = SuitePlanCompilationInput(source_asset_ids=f.source_asset_ids,
+        market_id='taobao', model_id='gpt-image-2-5', style_id='minimal', aspect_ratio='3:4',
+        resolution='标准 1K', output_language='中文', creation_mode='regular',
+        modules=[SuitePlanModuleInput('suite-detail', 1, facts,
+            regular_task={'goal': '未提供服务承诺，仅展示材质', 'copy': '买得安心'})])
+    plan = await f.service.compile_plan(f.project_id, request, 'latest-facts-priority')
+    detail = await f.plans.get_plan_detail(plan.id, f.workspace_id, f.project_id)
+    prompt = detail.modules[0].compiled_task_prompt
+    context = json.loads(prompt.split('\n', 1)[1])
+    assert context['assignedProductFacts'] == facts
+    assert context['copyPolicy'] == 'flexible'
+    assert 'currentInputPriority' in context
+    assert 'currentInputPriority' in prompt.split('\n', 1)[0]
+    assert 'Render approvedCopy' not in prompt
+    assert not f.compiler.requests
 
 
 def test_flexible_copy_replaces_original_copy_instruction_and_locks_supplied_facts():

@@ -130,10 +130,11 @@ async def test_project_reverse_execution_api_generates_images_with_task_filter()
         business = (await client.post("/api/projects", json={"name": "鼠标项目"})).json()["data"]
         response = await client.post(
             f"/api/projects/{business['id']}/reverse-execution/generate",
-            json={"expectedRevision": 2, "taskIds": ["task-1"], "aspectRatio": "3:4"},
+            json={"expectedRevision": 2, "taskIds": ["task-1"], "promptOverrides": {"task-1": "本次手动提示词"}, "aspectRatio": "3:4"},
         )
 
     assert response.status_code == 200, response.text
     assert generation.calls[0][1] == 2
     assert generation.calls[0][2]["task_ids"] == ["task-1"]
+    assert generation.calls[0][2]["prompt_overrides"] == {"task-1": "本次手动提示词"}
     assert response.json()["data"]["revision"] == 3

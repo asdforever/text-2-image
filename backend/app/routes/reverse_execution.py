@@ -47,6 +47,7 @@ class ReverseExecutionGenerate(BaseModel):
     planId: UUID | None = None
     batchId: UUID | None = None
     taskIds: list[str] | None = None
+    promptOverrides: dict[str, str] = Field(default_factory=dict, max_length=100)
     sourceAssetId: UUID | None = None
     auxiliarySourceAssetIds: list[UUID] | None = Field(default=None, max_length=4)
     aspectRatio: str = Field(default="1:1", min_length=1, max_length=20)
@@ -161,5 +162,6 @@ async def generate_reverse_execution(project_id: UUID, payload: ReverseExecution
         resolution=payload.resolution,
         plan_id=payload.planId,
         batch_id=payload.batchId,
+        prompt_overrides=payload.promptOverrides,
     )
     return success_response(reverse_execution_view(record))

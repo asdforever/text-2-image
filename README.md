@@ -2,6 +2,13 @@
 
 PicAgent Studio 的后端（FastAPI + Alembic）。前端在另一个仓库。
 
+## 项目文档
+
+- [项目演示稿](docs/project/project-demo.md)：整体运行流程、两种创作模式、反推和规划大师的现场讲解。
+- [学习与开发交接](docs/project/learning-and-handoff.md)：技术栈、架构、业务流程、代码入口与运行排查。
+- [面试与项目讲解](docs/project/interview-and-presentation.md)：介绍稿、技术取舍、亮点和追问参考。
+- [文档目录与维护约定](docs/project/README.md)。
+
 ## 本地运行
 
 ```bash

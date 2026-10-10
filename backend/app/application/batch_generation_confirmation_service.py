@@ -8,7 +8,6 @@ from ..core.errors import AppError
 from .idempotency import request_fingerprint
 from .module_planning_v2 import (
     PLANNER_VERSION_V2,
-    compose_v2_from_snapshot,
     render_v2_from_snapshot,
 )
 
@@ -41,21 +40,13 @@ class BatchGenerationConfirmationService:
         for task in detail.module_tasks:
             if task.snapshot.get("creationMode") == "regular":
                 rendered = render_regular(task.snapshot)
-                if normalized[task.module_key] != rendered:
-                    raise AppError("BATCH_GENERATION_REGULAR_PROMPT_IMMUTABLE", "常规模式提示词由服务端生成，确认时不能修改", 409)
-                continue
-            rendered = render_v2_from_snapshot(task.snapshot)
+            else:
+                rendered = render_v2_from_snapshot(task.snapshot)
             if task.compiled_task_prompt != rendered:
                 raise AppError(
                     "MODULE_PLANNING_SNAPSHOT_INVALID",
                     "V2 模块规划提示词与冻结快照不一致",
                     500,
-                )
-            if normalized[task.module_key] != rendered:
-                raise AppError(
-                    "BATCH_GENERATION_V2_PROMPT_IMMUTABLE",
-                    "V2 模块提示词由服务端生成，确认时不能修改",
-                    409,
                 )
         fingerprint = request_fingerprint(
             {"batchId": str(batch_id), "moduleTaskPrompts": normalized}
@@ -63,7 +54,7 @@ class BatchGenerationConfirmationService:
         confirmations: dict[str, GenerationModuleConfirmation] = {}
         for task in detail.module_tasks:
             task_prompt = normalized[task.module_key]
-            final_prompt = render_regular(task.snapshot) if task.snapshot.get("creationMode") == "regular" else compose_v2_from_snapshot(task.snapshot)
+            final_prompt = task_prompt
             confirmations[task.module_key] = GenerationModuleConfirmation(
                 task_prompt=task_prompt,
                 final_prompt=final_prompt,

@@ -22,6 +22,7 @@ V2_COMPOSER_VERSION = "final-composer-v2.1"
 
 _SYSTEM_PROMPT_BASE = (
     "你是电商图片模块规划器。你要直接写出一段可交给图片模型的画面描述提示词。\n\n"
+    "只返回符合 outputSchema 的 JSON 对象；imagePrompt 字段内仍使用描述式自然语言，不输出代码围栏或对象外的解释。\n\n"
 
     "【任务】\n"
     "根据固定风格种子、源图可见信息、模块任务和约束，为当前模块写一段中文画面描述。"

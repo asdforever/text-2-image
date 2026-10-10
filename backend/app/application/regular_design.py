@@ -13,7 +13,7 @@ from .product_appearance import product_appearance_contract
 
 class RegularTaskOptions(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    copyPolicy: Literal['fixed', 'flexible'] = 'fixed'
+    copyPolicy: Literal['fixed', 'flexible'] = 'flexible'
     visualRequirements: str = Field(default='', max_length=2000)
 
 
@@ -149,23 +149,29 @@ def regular_snapshot(request, selected, master, module, parameters, market, styl
         "userNotes": getattr(request, "user_notes", ""),
     }
     options = getattr(selected, 'regular_options', None)
-    if options is not None:
-        try:
-            options = RegularTaskOptions.model_validate(options).model_dump()
-        except ValidationError:
-            raise AppError('REGULAR_OPTIONS_INVALID', '文案策略或视觉要求无效', 400) from None
-        context.update(options)
-        context['lockedInformation'] = '品牌、商品参数、指定原文及商品事实必须准确；不得新增未经提供的功能、功效、价格或认证。'
-        if options['copyPolicy'] == 'flexible':
-            context['suggestedCopy'] = context.pop('approvedCopy')
+    try:
+        options = RegularTaskOptions.model_validate({} if options is None else options).model_dump()
+    except ValidationError:
+        raise AppError('REGULAR_OPTIONS_INVALID', '文案策略或视觉要求无效', 400) from None
+    context.update(options)
+    context['lockedInformation'] = '品牌、商品参数、指定原文及商品事实必须准确；不得新增未经提供的功能、功效、价格或认证。'
+    context['currentInputPriority'] = (
+        'assignedProductFacts 是本图最新补充的事实与要求，在真实性和平台规则范围内优先于旧 goal、文案建议及套图规划。'
+        '旧规划声称某项信息未提供时，如最新参数已提供该信息，应采用最新参数；按参数含义区分商品事实、服务承诺与设计要求，'
+        '设计要求不得误当作上图文案。flexible 时按本图目标组织相关参数的文案，suggestedCopy 仅作参考；'
+        'fixed 时 approvedCopy 必须原样保留，不自行改写或扩写。不得虚构参数之外的承诺或信息。'
+    )
+    if options['copyPolicy'] == 'flexible':
+        context['suggestedCopy'] = context.pop('approvedCopy')
     copy_instruction = (
         'Compose concise copy based on suggestedCopy and supplied facts in the requested language; preserve lockedInformation and respect platform restrictions. No collage. '
-        if options and options['copyPolicy'] == 'flexible' else
+        if options['copyPolicy'] == 'flexible' else
         'Render approvedCopy in the requested language, respecting platform restrictions. No collage. '
     )
     prompt = (
         "Create one ecommerce image for the supplied product. If the product appears, preserve its actual shape, materials, colors and markings. "
         "Use only supplied facts; do not invent claims, prices, certifications or extra text. "
+        "Follow currentInputPriority when current parameters conflict with older planning assumptions. "
         + copy_instruction +
         "This is one image in a coherent product suite: obey suiteConsistency, then obey the moduleDirection and moduleVariation for this image. "
         "The module direction controls the scene, camera and layout; the style seed does not force a repeated background. "
@@ -182,7 +188,7 @@ def regular_snapshot(request, selected, master, module, parameters, market, styl
         "module": module,
         "title": (outline or {}).get("taskTitle", module.get("label", selected.module_id)),
         "regularTask": task,
-        **({'regularOptions': options} if options is not None else {}),
+        'regularOptions': options,
         "moduleParameters": facts,
         "compiledTaskPrompt": prompt,
         "recipe": dict(RECIPE),

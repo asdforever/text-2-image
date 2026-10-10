@@ -91,6 +91,7 @@ class ReverseExecutionGenerationService:
         resolution: str = "标准 1K",
         plan_id: UUID | None = None,
         batch_id: UUID | None = None,
+        prompt_overrides: dict[str, str] | None = None,
     ) -> ReverseExecutionPlanRecord:
         plan = await self.plan_service.get(project_id, plan_id)
         if plan is None:
@@ -107,6 +108,13 @@ class ReverseExecutionGenerationService:
             raise AppError("REVERSE_EXECUTION_TASKS_INVALID", "请选择当前方案或批次中的有效任务", 400)
         if batch and selected is None:
             raise AppError("REVERSE_EXECUTION_TASKS_INVALID", "批次重试必须选择具体任务", 400)
+        overrides = {} if prompt_overrides is None else prompt_overrides
+        if (not isinstance(overrides, dict) or len(overrides) > 100
+                or not set(overrides).issubset(selected if selected is not None else available_tasks)
+                or any(not isinstance(value, str) or not value.strip() or len(value) > 50000 for value in overrides.values())):
+            raise AppError("REVERSE_PROMPT_OVERRIDES_INVALID", "本次提示词必须对应所选任务且不能为空，最多50000字", 400)
+        if batch and overrides:
+            raise AppError("REVERSE_BATCH_PROMPT_IMMUTABLE", "批次重试沿用该批次提示词，请创建新批次使用修改内容", 409)
         saved_source_id = document.get("sourceAssetId")
         if batch:
             source_asset_id = None  # Retry always uses the original batch input.
@@ -153,7 +161,9 @@ class ReverseExecutionGenerationService:
                 aspectRatio=effective_aspect_ratio, resolution=effective_resolution, modelConnection=model_connection,
                 requestedTaskIds=list(selected) if selected is not None else list(available_tasks))
             for task in document["tasks"]:
-                task["promptDraft"] = compile_task_prompt(task, product_facts, output_settings, product_image_count=len(product_inputs))
+                compiled_prompt = compile_task_prompt(task, product_facts, output_settings, product_image_count=len(product_inputs))
+                task['compiledPrompt'] = compiled_prompt
+                task["promptDraft"] = overrides.get(task['id'], compiled_prompt).strip()
                 task["attempts"] = []
                 task["status"] = "queued" if selected is None or task["id"] in selected else "not_requested"
                 for field in ("generatedAssetId", "generatedPreviewUrl", "generatedAt", "error"):
@@ -206,7 +216,7 @@ class ReverseExecutionGenerationService:
         next_plan["sourceAssetId"] = str(source.id)
         next_plan["auxiliarySourceAssetIds"] = auxiliary_ids
         next_plan["lastBatchId"] = str(batch.id)
-        next_plan["tasks"] = [{key: value for key, value in task.items() if key != "attempts"} for task in document["tasks"]]
+        next_plan["tasks"] = [{key: value for key, value in task.items() if key not in {"attempts", "compiledPrompt"}} for task in document["tasks"]]
         try:
             return await self.plan_service.save(project_id, expected_revision, next_plan, plan_id=plan.id)
         except AppError as exc:

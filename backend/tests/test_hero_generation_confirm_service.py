@@ -117,29 +117,23 @@ async def test_duplicate_confirmation_returns_same_result_without_second_provide
 
 
 @pytest.mark.asyncio
-async def test_v2_confirmation_rejects_prompt_mutation_and_recomposes_from_snapshot() -> None:
+async def test_v2_confirmation_sends_manual_prompt_and_preserves_original_compile() -> None:
     fixture = await _fixture(planner_version="v2", compiler=V2Compiler())
     task = await fixture.service.compile_prompt(
         fixture.project.id, _compile_input(fixture.source.id), "compile-v2"
     )
 
-    with pytest.raises(AppError) as changed:
-        await fixture.service.confirm_generation(
-            fixture.project.id,
-            task.id,
-            task_prompt=task.compiled_task_prompt + " 绕过服务端构图",
-            idempotency_key="confirm-changed",
-        )
-    assert changed.value.code == "HERO_GENERATION_V2_PROMPT_IMMUTABLE"
-    assert fixture.editor.requests == []
+    edited = task.compiled_task_prompt + " 右侧增加留白"
 
     completed = await fixture.service.confirm_generation(
         fixture.project.id,
         task.id,
-        task_prompt=task.compiled_task_prompt,
+        task_prompt=edited,
         idempotency_key="confirm-v2",
     )
-    assert completed.confirmed_task_prompt == task.compiled_task_prompt
+    assert completed.confirmed_task_prompt == edited
+    assert completed.compiled_task_prompt == task.compiled_task_prompt
+    assert fixture.editor.requests[0].prompt == edited
     assert completed.final_prompt.strip()
     assert completed.final_prompt_sha256 == __import__("hashlib").sha256(
         completed.final_prompt.encode("utf-8")

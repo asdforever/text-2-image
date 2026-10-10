@@ -16,6 +16,30 @@ from backend.app.application.module_planning_service import ModuleMasterRequest
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize('kind', ['hero', 'suite'])
+async def test_professional_compiler_satisfies_deepseek_json_mode_requirement(kind):
+    from backend.app.application.module_planning_v2 import SYSTEM_PROMPT_BASE
+    from backend.tests.test_module_planning_v2 import _result_payload
+
+    async def handler(request):
+        payload = json.loads(await request.aread())
+        assert payload['response_format'] == {'type': 'json_object'}
+        system = payload['messages'][0]['content']
+        if 'json' not in system.lower():
+            return httpx.Response(400, json={'error': {'message': "Prompt must contain the word 'json'"}})
+        return httpx.Response(200, json={'choices': [{'message': {'content': json.dumps(_result_payload())}}]})
+
+    cls = OpenAICompatiblePromptCompiler if kind == 'hero' else OpenAICompatibleSuitePlannerCompiler
+    compiler = cls(base_url='https://api.deepseek.com', api_key='test-key',
+                   model='deepseek-flash', timeout_ms=1000, transport=httpx.MockTransport(handler))
+    request = (PromptCompileRequest(system_prompt=SYSTEM_PROMPT_BASE, user_prompt='根据当前资料规划。',
+                                   image_bytes=b'png', image_mime_type='image/png') if kind == 'hero' else
+               SimpleNamespace(system_prompt=SYSTEM_PROMPT_BASE, user_prompt='根据当前资料规划。',
+                               image_inputs=[b'png'], image_mime_types=['image/png']))
+    assert (await compiler.compile(request)).imagePrompt
+
+
+@pytest.mark.asyncio
 async def test_suite_planner_compiler_sends_all_images_and_parses_module_plan() -> None:
     captured = {}
 

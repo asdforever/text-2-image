@@ -122,7 +122,8 @@ async def test_regular_edited_parameters_change_prompt_and_cannot_reuse_compile_
     assert 'Linen' in b.module_tasks[0].compiled_task_prompt
     assert 'Cotton' not in b.module_tasks[0].compiled_task_prompt
     confirmation = BatchGenerationConfirmationService(f.repository,f.service.identity_provider)
-    with pytest.raises(AppError) as error:
-        await confirmation.confirm_batch(f.project_id,second.id,{b.module_tasks[0].module_key:'override'},'bad-confirm')
-    assert error.value.code == "BATCH_GENERATION_REGULAR_PROMPT_IMMUTABLE"
+    await confirmation.confirm_batch(f.project_id,second.id,{b.module_tasks[0].module_key:'override'},'manual-confirm')
+    confirmed = await f.repository.get_batch_detail(second.id,f.workspace_id)
+    assert confirmed.module_tasks[0].final_prompt == 'override'
+    assert confirmed.module_tasks[0].compiled_task_prompt == b.module_tasks[0].compiled_task_prompt
 

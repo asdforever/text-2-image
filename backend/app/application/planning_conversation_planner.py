@@ -13,7 +13,9 @@ class PlanningConversationPlanner:
         context = json.loads(request.user_prompt)
         context.update(currentEffectiveSnapshot=base, feedback=text, recentConversation=messages,
                        outputSchema=Reply.model_json_schema(), conversationInstructions=(
-                           '每轮保留未要求修改的内容、taskId 和自定义参数。用户未明确允许时保持批准文案原样。'
+                           '每轮保留未要求修改的内容、taskId 和自定义参数。常规版 copyPolicy 未设置时默认为 flexible，'
+                           '允许根据已提供参数组织参考文案；只有 copyPolicy=fixed 时保持锁定文案原样。'
+                           '本图最新补充参数优先于旧规划关于缺失信息的假设，不得虚构事实或承诺。'
                            '提问、解释、比较、建议和讨论返回 answer 和空 operations，只回答，不修改方案或新增图片。'
                            '结合当前有效方案和最近对话回答，可提出建议，但建议本身不代表用户同意修改。'
                            '例如“为什么第二张这样安排”“能只展示糖粒吗”“你觉得怎么更合理”都是讨论。'
