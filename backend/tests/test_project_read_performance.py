@@ -33,7 +33,7 @@ def client_for(repository):
     return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
 
 
-def test_project_list_includes_lightweight_counts_and_source_first_cover():
+def test_project_list_includes_lightweight_counts_and_generated_first_cover():
     async def run():
         repo = InMemoryProjectRepository()
         project = await repo.create_project("商品", WORKSPACE)
@@ -58,16 +58,44 @@ def test_project_list_includes_lightweight_counts_and_source_first_cover():
             rows = {r["id"]: r for r in response.json()["data"]}
             assert set(rows) == {str(project.id), str(empty.id)}
             assert rows[str(project.id)]["assetCount"] == 4
-            assert rows[str(project.id)]["coverAssetId"] == str(source.id)
+            assert rows[str(project.id)]["coverAssetId"] == str(generated.id)
             assert rows[str(empty.id)]["assetCount"] == 0
             assert rows[str(empty.id)]["coverAssetId"] is None
             assert "assets" not in rows[str(project.id)]
             assert "private/" not in response.text
             all_rows = (await client.get("/api/projects?includeArchived=true")).json()["data"]
             assert {r["id"] for r in all_rows} == {str(project.id), str(empty.id), str(archived.id)}
-            source.state = old_source.state = "deleted"
+            generated.state = "deleted"
             fallback = (await client.get("/api/projects")).json()["data"]
-            assert next(r for r in fallback if r["id"] == str(project.id))["coverAssetId"] == str(generated.id)
+            assert next(r for r in fallback if r["id"] == str(project.id))["coverAssetId"] is None
+    asyncio.run(run())
+
+
+def test_cover_prefers_latest_usable_generated_image_then_white_background():
+    async def run():
+        repo = InMemoryProjectRepository()
+        project = await repo.create_project("生成结果封面", WORKSPACE)
+        now = datetime.now(timezone.utc)
+        source, _ = await add_asset(repo, project)
+        old_result, _ = await add_asset(repo, project, "generated")
+        result, obj = await add_asset(repo, project, "generated")
+        white, _ = await add_asset(repo, project, "white_background")
+        source.created_at = white.created_at = now
+        old_result.created_at = now - timedelta(days=2)
+        result.created_at = now - timedelta(days=1)
+        async with client_for(repo) as client:
+            async def cover():
+                rows = (await client.get("/api/projects")).json()["data"]
+                return rows[0]["coverAssetId"]
+
+            assert await cover() == str(result.id)
+            obj.state = "cleanup_pending"
+            assert await cover() == str(old_result.id)
+            old_result.state = "deleted"
+            assert await cover() == str(white.id)
+            white.state = "cleanup_pending"
+            assert await cover() is None
+
     asyncio.run(run())
 
 

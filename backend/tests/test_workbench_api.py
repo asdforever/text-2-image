@@ -12,6 +12,29 @@ from backend.app.core.identity import IdentityContext
 
 
 @pytest.mark.asyncio
+async def test_workbench_layout_round_trips_manual_connections_and_disconnects() -> None:
+    app = create_app(settings=Settings(_env_file=None), workbench_repository=InMemoryWorkbenchRepository())
+    project_id = uuid4()
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        path = f"/api/suites/{project_id}/workbench"
+        nodes = [{"nodeId": "asset:source", "x": 80, "y": 160, "connections": ["asset:result"]}, {"nodeId": "asset:result", "x": 600, "y": 160}]
+        saved = await client.patch(f"{path}/layout", json={"layoutVersion": 0, "viewport": {"x": 0, "y": 0, "zoom": 1}, "nodes": nodes, "groups": []})
+        assert saved.status_code == 200
+        fetched = await client.get(path)
+        assert fetched.status_code == 200
+        assert fetched.json()["data"]["layout"]["nodes"] == nodes
+        nodes[0]["x"] = 180
+        moved = await client.patch(f"{path}/layout", json={"layoutVersion": saved.json()["data"]["layoutVersion"], "viewport": {"x": 0, "y": 0, "zoom": 1}, "nodes": nodes, "groups": []})
+        assert moved.status_code == 200
+        assert (await client.get(path)).json()["data"]["layout"]["nodes"] == nodes
+        del nodes[0]["connections"]
+        disconnected = await client.patch(f"{path}/layout", json={"layoutVersion": moved.json()["data"]["layoutVersion"], "viewport": {"x": 0, "y": 0, "zoom": 1}, "nodes": nodes, "groups": []})
+        assert disconnected.status_code == 200
+        assert (await client.get(path)).json()["data"]["layout"]["nodes"] == nodes
+
+
+@pytest.mark.asyncio
 async def test_workbench_api_reads_edits_versions_layout_and_references() -> None:
     workspace_id = uuid4()
     app = create_app(

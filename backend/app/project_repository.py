@@ -110,10 +110,11 @@ class InMemoryProjectRepository:
             covers = [
                 asset for asset in assets
                 if asset.state == "available"
+                and asset.kind in {"generated", "white_background"}
                 and (obj := self._objects.get(asset.object_id)) is not None
                 and obj.workspace_id == workspace_id and obj.state == "available"
             ]
-            cover = max(covers, key=lambda a: (a.kind == "source", a.created_at, a.id), default=None)
+            cover = max(covers, key=lambda a: (a.kind == "generated", a.created_at, a.id), default=None)
             summaries.append(ProjectSummaryRecord(project, len(assets), cover.id if cover else None))
         return summaries
 
@@ -334,8 +335,9 @@ class PostgresProjectRepository:
                     "FROM project_workbench.projects project "
                     "LEFT JOIN LATERAL ("
                     "SELECT count(*) AS asset_count, "
-                    "(array_agg(asset.id ORDER BY (asset.kind='source') DESC, asset.created_at DESC, asset.id DESC) "
-                    "FILTER (WHERE asset.state='available' AND obj.state='available'))[1] AS cover_asset_id "
+                    "(array_agg(asset.id ORDER BY (asset.kind='generated') DESC, asset.created_at DESC, asset.id DESC) "
+                    "FILTER (WHERE asset.kind IN ('generated', 'white_background') "
+                    "AND asset.state='available' AND obj.state='available'))[1] AS cover_asset_id "
                     "FROM project_workbench.project_assets asset "
                     "LEFT JOIN project_workbench.asset_objects obj ON obj.id=asset.object_id "
                     "AND obj.workspace_id=:workspace_id "
